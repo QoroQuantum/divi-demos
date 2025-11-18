@@ -51,7 +51,7 @@ The project uses financial data files (`.npy` format):
 The core logic depends on the `divi` library from Qoro Quantum. You can install it using pip:
 
 ```bash
-pip install qoro-divi==0.4.1
+pip install qoro-divi==0.4.2
 ```
 
 ## How to Use
