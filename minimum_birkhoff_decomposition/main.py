@@ -4,11 +4,10 @@ import os
 
 import numpy as np
 import pennylane as qml
+from birkhoff_vqe import BirkhoffDecomposition, combination_to_integer
 from divi.backends import ParallelSimulator
 from divi.qprog.algorithms._ansatze import GenericLayerAnsatz
 from divi.qprog.optimizers import MonteCarloOptimizer, ScipyMethod, ScipyOptimizer
-
-from birkhoff_vqe import BirkhoffDecomposition, combination_to_integer
 
 
 def parse_arguments():
