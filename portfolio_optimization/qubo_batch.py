@@ -3,6 +3,7 @@
 # SPDX-License-Identifier: Apache-2.0
 
 import numpy as np
+import copy
 from functools import partial
 from typing import Any
 
@@ -69,10 +70,14 @@ class QUBOBatch(ProgramBatch):
         self.full_solution = None
         self.partitions = partitions
 
+        # Store the optimizer prototype
+        self.optimizer_prototype = (
+            optimizer if optimizer is not None else MonteCarloOptimizer()
+        )
+
         # Create a partial function for constructing QAOA instances
         self._constructor = partial(
             QAOA,
-            optimizer=optimizer if optimizer is not None else MonteCarloOptimizer(),
             max_iterations=self.max_iterations,
             backend=self.backend,
             n_layers=n_layers,
@@ -88,9 +93,13 @@ class QUBOBatch(ProgramBatch):
         super().create_programs()
 
         for prog_id, qubo in self._qubos.items():
+            # Create a deep copy of the optimizer for each program to avoid shared state
+            program_optimizer = copy.deepcopy(self.optimizer_prototype)
+
             self._programs[prog_id] = self._constructor(
                 job_id=prog_id,
                 problem=qubo,
+                optimizer=program_optimizer,
                 progress_queue=self._queue,
             )
 
