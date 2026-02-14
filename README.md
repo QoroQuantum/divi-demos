@@ -37,7 +37,7 @@ Quantum portfolio optimization using QAOA combined with spectral partitioning to
 
 ### 4. [Quantum-Guided Cluster Algorithm](./quantum-guided-cluster)
 
-Implementation of the Quantum-Guided Cluster Algorithm from [arXiv:2508.10656](https://arxiv.org/abs/2508.10656) (Amazon Quantum Solutions Lab). QAOA is run once to extract two-point correlations ⟨Z_i Z_j⟩, which then guide a classical cluster Monte Carlo for Max-Cut — combining quantum insight with efficient classical post-processing.
+Implementation of the Quantum-Guided Cluster Algorithm from [arXiv:2508.10656](https://arxiv.org/abs/2508.10656). QAOA is run once to extract two-point correlations ⟨Z_i Z_j⟩, which then guide a classical cluster Monte Carlo for Max-Cut — combining quantum insight with efficient classical post-processing.
 
 **Key Features:**
 - QAOA as a one-shot correlation oracle for combinatorial optimization
