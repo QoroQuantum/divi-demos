@@ -74,7 +74,7 @@ def ising_energy(G: nx.Graph, config: np.ndarray) -> float:
 def extract_qaoa_correlations(
     G: nx.Graph,
     n_layers: int,
-    max_iterations: int = 30,
+    max_iterations: int = 10,
     shots: int = 10_000,
     use_qdrift: bool = False,
     backend=None,

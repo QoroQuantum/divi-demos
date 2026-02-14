@@ -124,10 +124,12 @@ def run_benchmark(
         n_repetitions=n_repetitions, seed=seed,
     )
     sa_time = time.time() - t0
-    sa_r = approx_ratio(sa_result.best_energy)
-    sa_mean_r = np.mean([e / E_ground for e in sa_result.energy_history]) if E_ground else float("nan")
-    print(f"   Best E = {sa_result.best_energy:.1f}  |  "
-          f"mean r = {sa_mean_r:.3f}  |  best r = {sa_r:.3f}  |  {sa_time:.2f}s")
+    if E_ground is not None:
+        sa_mean_r = np.mean([e / E_ground for e in sa_result.energy_history])
+        print(f"   Best E = {sa_result.best_energy:.1f}  |  "
+              f"mean r = {sa_mean_r:.3f}  |  best r = {approx_ratio(sa_result.best_energy):.3f}  |  {sa_time:.2f}s")
+    else:
+        print(f"   Best E = {sa_result.best_energy:.1f}  |  {sa_time:.2f}s")
 
     # 2. Coupling Constants
     print(f"\n{'─'*70}")
@@ -139,11 +141,14 @@ def run_benchmark(
         n_repetitions=n_repetitions, lambda_scale=1, seed=seed,
     )
     cc_time = time.time() - t0
-    cc_r = approx_ratio(cc_result.best_energy)
-    cc_mean_r = np.mean([e / E_ground for e in cc_result.energy_history]) if E_ground else float("nan")
-    print(f"   Best E = {cc_result.best_energy:.1f}  |  "
-          f"mean r = {cc_mean_r:.3f}  |  best r = {cc_r:.3f}  |  "
-          f"accept = {cc_result.acceptance_rate:.1%}  |  {cc_time:.2f}s")
+    if E_ground is not None:
+        cc_mean_r = np.mean([e / E_ground for e in cc_result.energy_history])
+        print(f"   Best E = {cc_result.best_energy:.1f}  |  "
+              f"mean r = {cc_mean_r:.3f}  |  best r = {approx_ratio(cc_result.best_energy):.3f}  |  "
+              f"accept = {cc_result.acceptance_rate:.1%}  |  {cc_time:.2f}s")
+    else:
+        print(f"   Best E = {cc_result.best_energy:.1f}  |  "
+              f"accept = {cc_result.acceptance_rate:.1%}  |  {cc_time:.2f}s")
 
     # 3. QAOA-guided at each depth
     qaoa_results = {}
@@ -156,7 +161,7 @@ def run_benchmark(
 
         # Extract correlations
         Z_qaoa, qaoa_instance = extract_qaoa_correlations(
-            G, n_layers=p, max_iterations=10, shots=shots, backend=backend,
+            G, n_layers=p, max_iterations=10, shots=shots, backend=backend, use_qdrift=False,
         )
         qaoa_instances[p] = qaoa_instance
         qaoa_correlations[f"QAOA p={p}"] = Z_qaoa
@@ -170,30 +175,48 @@ def run_benchmark(
         ca_time = time.time() - t0
         qaoa_results[p] = qaoa_result
 
-        q_r = approx_ratio(qaoa_result.best_energy)
-        q_mean_r = np.mean([e / E_ground for e in qaoa_result.energy_history]) if E_ground else float("nan")
-        print(f"   Best E = {qaoa_result.best_energy:.1f}  |  "
-              f"mean r = {q_mean_r:.3f}  |  best r = {q_r:.3f}  |  "
-              f"accept = {qaoa_result.acceptance_rate:.1%}  |  "
-              f"circuits = {qaoa_instance.total_circuit_count}  |  {ca_time:.2f}s")
+        if E_ground is not None:
+            q_mean_r = np.mean([e / E_ground for e in qaoa_result.energy_history])
+            print(f"   Best E = {qaoa_result.best_energy:.1f}  |  "
+                  f"mean r = {q_mean_r:.3f}  |  best r = {approx_ratio(qaoa_result.best_energy):.3f}  |  "
+                  f"accept = {qaoa_result.acceptance_rate:.1%}  |  "
+                  f"circuits = {qaoa_instance.total_circuit_count}  |  {ca_time:.2f}s")
+        else:
+            print(f"   Best E = {qaoa_result.best_energy:.1f}  |  "
+                  f"accept = {qaoa_result.acceptance_rate:.1%}  |  "
+                  f"circuits = {qaoa_instance.total_circuit_count}  |  {ca_time:.2f}s")
 
     # ── Summary table ──
     print(f"\n{'='*70}")
     print("  RESULTS SUMMARY")
     if E_ground is not None:
         print(f"  E₀ = {E_ground:.1f} (exact ground state)")
-    print(f"  (lower energy = better, r closer to 1 = better)")
+        print(f"  (lower energy = better, r closer to 1 = better)")
+    else:
+        print(f"  ⚠️  Ground state unknown (n={G.number_of_nodes()} > 22, brute force skipped)")
+        print(f"  Using best energy found across all methods as reference.")
     print(f"{'='*70}")
-    print(f"  {'Method':<28} {'Best E':>8} {'Mean r':>8} {'Best r':>8} {'σ(r)':>8} {'Accept':>8}")
-    print(f"  {'─'*68}")
 
-    def print_row(name, result, show_accept=False):
-        ratios = [e / E_ground for e in result.energy_history] if E_ground else []
-        mr = np.mean(ratios) if ratios else float("nan")
-        sr = np.std(ratios) if ratios else float("nan")
-        br = approx_ratio(result.best_energy)
-        acc = f"{result.acceptance_rate:>7.1%}" if show_accept else f"{'—':>8}"
-        print(f"  {name:<28} {result.best_energy:>8.1f} {mr:>8.3f} {br:>8.3f} {sr:>8.3f} {acc}")
+    if E_ground is not None:
+        print(f"  {'Method':<28} {'Best E':>8} {'Mean r':>8} {'Best r':>8} {'σ(r)':>8} {'Accept':>8}")
+        print(f"  {'─'*68}")
+
+        def print_row(name, result, show_accept=False):
+            ratios = [e / E_ground for e in result.energy_history]
+            mr = np.mean(ratios)
+            sr = np.std(ratios)
+            br = approx_ratio(result.best_energy)
+            acc = f"{result.acceptance_rate:>7.1%}" if show_accept else f"{'—':>8}"
+            print(f"  {name:<28} {result.best_energy:>8.1f} {mr:>8.3f} {br:>8.3f} {sr:>8.3f} {acc}")
+    else:
+        print(f"  {'Method':<28} {'Best E':>8} {'Mean E':>8} {'σ(E)':>8} {'Accept':>8}")
+        print(f"  {'─'*60}")
+
+        def print_row(name, result, show_accept=False):
+            me = np.mean(result.energy_history)
+            se = np.std(result.energy_history)
+            acc = f"{result.acceptance_rate:>7.1%}" if show_accept else f"{'—':>8}"
+            print(f"  {name:<28} {result.best_energy:>8.1f} {me:>8.1f} {se:>8.1f} {acc}")
 
     print_row("Simulated Annealing", sa_result, show_accept=False)
     print_row("Cluster (Coupling Const.)", cc_result, show_accept=True)
@@ -229,7 +252,7 @@ def run_benchmark(
 
 if __name__ == "__main__":
     results = run_benchmark(
-        n_nodes=16,              # 16 qubits — local simulator.
+        n_nodes=18,              # 16 qubits — local simulator.
         degree=10,               # Dense graph — more frustrated, harder for all methods.
         qaoa_depths=[1, 2, 3, 5],  # p=2 is the key transition point (see AWS blog / paper Fig. 3).
         n_iterations_factor=500, # Generous budget — focus on correlation quality.
