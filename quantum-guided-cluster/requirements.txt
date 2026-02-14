@@ -1,0 +1,4 @@
+qoro-divi>=0.7.0
+networkx>=3.0
+matplotlib>=3.8
+numpy>=1.24
