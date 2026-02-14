@@ -23,7 +23,7 @@ import numpy as np
 
 from divi.backends import ParallelSimulator
 from divi.qprog import QAOA, GraphProblem
-from divi.qprog.optimizers import ScipyOptimizer, ScipyMethod
+from divi.qprog.optimizers import PymooOptimizer, PymooMethod
 from divi.qprog import QDrift
 
 
@@ -108,7 +108,7 @@ def extract_qaoa_correlations(
         problem=G,
         graph_problem=GraphProblem.MAXCUT,
         n_layers=n_layers,
-        optimizer=ScipyOptimizer(method=ScipyMethod.COBYLA),
+        optimizer=PymooOptimizer(method=PymooMethod.DE, population_size=20),
         max_iterations=max_iterations,
         backend=backend,
         # QWC grouping: groups commuting ZZ observables together

@@ -108,7 +108,7 @@ def run_benchmark(
     # --- Backend setup ---
     if use_cloud:
         from divi.backends import QoroService, JobConfig
-        backend = QoroService(config=JobConfig(shots=shots))
+        backend = QoroService(config=JobConfig(qpu_system="qoro_maestro", shots=shots))
         print(f"\n☁️  Using QoroService backend (shots={shots})")
     else:
         backend = ParallelSimulator(shots=shots)
@@ -156,7 +156,7 @@ def run_benchmark(
 
         # Extract correlations
         Z_qaoa, qaoa_instance = extract_qaoa_correlations(
-            G, n_layers=p, max_iterations=30, shots=shots, backend=backend,
+            G, n_layers=p, max_iterations=10, shots=shots, backend=backend,
         )
         qaoa_instances[p] = qaoa_instance
         qaoa_correlations[f"QAOA p={p}"] = Z_qaoa
@@ -236,7 +236,7 @@ if __name__ == "__main__":
         n_repetitions=30,        # Enough restarts for statistics.
         lambda_scale=4,          # Cluster link scaling.
         seed=42,
-        use_cloud=False,         # Set True for >18 qubits with QoroService.
+        use_cloud=True,         # Set True for >18 qubits with QoroService.
         shots=10_000,
         output_dir="plots",
     )
