@@ -40,7 +40,7 @@ depth.
 .
 ├── main.py           # Benchmark runner — orchestrates experiments and generates plots
 ├── algorithm.py      # Core algorithm: graph gen, QAOA correlations, cluster MC, SA baseline
-├── plotting.py       # Dark-themed visualization utilities (4 publication-quality plots)
+├── plotting.py       # Dark-themed visualization utilities (4 plots)
 ├── plots/            # Generated visualizations (created on first run)
 │   ├── 1_approximation_ratios.png
 │   ├── 2_correlation_heatmaps.png
@@ -90,7 +90,7 @@ The terminal prints a summary table comparing all methods:
   QAOA-Guided (p=5)               -34.0    0.992    1.000    0.042    2.3%
 ```
 
-Four publication-quality plots are saved to the `plots/` directory:
+Four plots are saved to the `plots/` directory:
 
 | Plot | What It Shows |
 |------|---------------|
