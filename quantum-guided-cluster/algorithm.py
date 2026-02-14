@@ -465,3 +465,122 @@ def coupling_constant_correlations(G: nx.Graph) -> np.ndarray:
         Z[v, u] = w
     np.fill_diagonal(Z, 1.0)
     return Z
+
+
+# ──────────────────────────────────────────────────────────────────
+# 7. PCE-based correlation extraction
+# ──────────────────────────────────────────────────────────────────
+def maxcut_to_qubo(G: nx.Graph) -> np.ndarray:
+    """Convert a Max-Cut graph to a QUBO matrix (minimization form).
+
+    For Max-Cut, the cut value is:
+        C(x) = Σ_{(i,j)∈E} w_ij * (x_i + x_j - 2 x_i x_j)
+
+    As a QUBO minimization (minimize x^T Q x):
+        Q_ij = -w_ij  (off-diagonal, for each edge)
+        Q_ii = Σ_j w_ij  (diagonal = weighted degree)
+    """
+    n = G.number_of_nodes()
+    Q = np.zeros((n, n))
+    for u, v, w in G.edges(data="weight", default=1.0):
+        Q[u, v] -= w
+        Q[v, u] -= w
+        Q[u, u] += w
+        Q[v, v] += w
+    return Q
+
+
+def extract_pce_correlations(
+    G: nx.Graph,
+    encoding_type: str = "dense",
+    max_iterations: int = 10,
+    shots: int = 10_000,
+    alpha: float = 2.0,
+    backend=None,
+) -> tuple[np.ndarray, "PCE"]:
+    """Run PCE on a Max-Cut QUBO and extract variable-variable correlations.
+
+    PCE encodes N variables into far fewer qubits (O(log₂N) for dense,
+    O(√N) for poly) using Pauli correlation encoding. Each variable is
+    mapped to the parity of a qubit subset. We decode the measurement
+    distribution to recover variable-level correlations.
+
+    Args:
+        G: The Max-Cut graph.
+        encoding_type: "dense" (log₂N qubits) or "poly" (√N qubits).
+        max_iterations: Optimizer iterations for PCE.
+        shots: Number of measurement shots.
+        alpha: PCE softness parameter (lower = smoother gradient).
+        backend: Divi backend. Defaults to ParallelSimulator.
+
+    Returns:
+        Z: (n x n) correlation matrix decoded from PCE measurements.
+        pce_instance: The solved PCE instance for inspection.
+    """
+    from divi.qprog import PCE
+    from divi.qprog.algorithms._pce import _fast_popcount_parity
+
+    n = G.number_of_nodes()
+    Q = maxcut_to_qubo(G)
+
+    if backend is None:
+        backend = ParallelSimulator(shots=shots)
+
+    # First create PCE without n_electrons to discover n_qubits,
+    # then set n_electrons (UCCSD requires n_electrons < n_qubits, even).
+    pce_instance = PCE(
+        qubo_matrix=Q,
+        encoding_type=encoding_type,
+        alpha=alpha,
+        n_layers=2,
+        n_electrons=2,   # placeholder — will be overridden
+        max_iterations=max_iterations,
+        backend=backend,
+        optimizer=PymooOptimizer(method=PymooMethod.DE, population_size=20),
+    )
+    # Now set n_electrons properly: must be even and < n_qubits
+    n_elec = max(2, (pce_instance.n_qubits - 2) // 2 * 2)
+    pce_instance.n_electrons = n_elec
+
+    print(f"  Running PCE ({encoding_type} encoding, "
+          f"{pce_instance.n_qubits} qubits for {n} variables)...")
+    t0 = time.time()
+    pce_instance.run(perform_final_computation=True)
+    elapsed = time.time() - t0
+    print(f"  PCE done in {elapsed:.1f}s  |  "
+          f"circuits={pce_instance.total_circuit_count}  |  "
+          f"best_loss={pce_instance.best_loss:.4f}")
+
+    # --- Decode variable-variable correlations from PCE measurements ---
+    raw_probs = pce_instance.best_probs
+    if raw_probs is None:
+        raise RuntimeError("PCE did not produce probability data.")
+
+    probs: dict[str, float] = {}
+    for tag, shots_dict in raw_probs.items():
+        if isinstance(shots_dict, dict):
+            for bitstring, prob in shots_dict.items():
+                probs[bitstring] = probs.get(bitstring, 0.0) + prob
+            break
+
+    if not probs:
+        raise RuntimeError("Could not extract probability data from PCE results.")
+
+    # For each bitstring in the encoded space, decode the parity of each
+    # variable using PCE's masks, then compute the correlation matrix.
+    masks = pce_instance._variable_masks_u64
+    Z = np.zeros((n, n))
+
+    for bitstring, prob in probs.items():
+        x = np.uint64(int(bitstring, 2))
+        # Compute parity for each variable: popcount(x & mask_i) % 2
+        overlaps = masks & x
+        parities = _fast_popcount_parity(overlaps)
+        # Convert parities to ±1 spins (0 → +1, 1 → −1)
+        spins = 1.0 - 2.0 * parities.astype(float)
+        Z += prob * np.outer(spins, spins)
+
+    np.fill_diagonal(Z, 1.0)
+
+    return Z, pce_instance
+
