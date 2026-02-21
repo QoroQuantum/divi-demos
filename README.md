@@ -2,6 +2,15 @@
 
 Example programs demonstrating quantum algorithms with the [Divi](https://dash.qoroquantum.net) quantum programming framework.
 
+## Table of Contents
+
+1. [Cluster MaxCut](#1-cluster-maxcut) — Partitioned QAOA for large graphs
+2. [Minimum Birkhoff Decomposition](#2-minimum-birkhoff-decomposition) — VQE for matrix decomposition
+3. [Portfolio Optimization](#3-portfolio-optimization) — QAOA/PCE for financial optimization
+4. [Quantum-Guided Cluster Algorithm](#4-quantum-guided-cluster-algorithm) — QAOA-guided Monte Carlo
+5. [Economic Load Dispatch](#5-economic-load-dispatch) — PCE-VQE for power dispatch
+6. [Molecular Ground State](#6-molecular-ground-state) — VQE for H₂ potential energy surface
+
 ## Getting Started
 
 ```bash
