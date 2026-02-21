@@ -13,10 +13,10 @@ import dimod
 import numpy as np
 import pennylane as qml
 
-from divi.backends import ParallelSimulator
+from divi.backends import ParallelSimulator, QoroService, JobConfig
 from divi.qprog import PCE, GenericLayerAnsatz
 from divi.qprog.optimizers import PymooMethod, PymooOptimizer
-from divi.typing import qubo_to_matrix
+from divi.qprog.typing import qubo_to_matrix
 
 
 # ─────────────────────────────────────────────────────────────────────
@@ -189,7 +189,7 @@ def classical_brute_force(generators, demand, bqm):
 # ─────────────────────────────────────────────────────────────────────
 
 def solve_with_pce(bqm, n_layers=3, max_iterations=20, alpha=3.0,
-                   population_size=30, shots=10000):
+                   population_size=30, shots=10000, backend=None):
     """Run the PCE-VQE quantum solver on the BQM.
 
     PCE (Pauli Correlation Encoding) compresses 12 QUBO variables into
@@ -203,10 +203,14 @@ def solve_with_pce(bqm, n_layers=3, max_iterations=20, alpha=3.0,
         alpha:            binary activation hardness (higher = sharper)
         population_size:  DE population per generation
         shots:            measurement samples per circuit evaluation
+        backend:          Divi backend (ParallelSimulator or QoroService)
 
     Returns:
         pce_solver:  the solved PCE object (access .solution, .get_top_solutions)
     """
+    if backend is None:
+        backend = ParallelSimulator(shots=shots)
+
     qubo_mat = qubo_to_matrix(bqm)
 
     ansatz = GenericLayerAnsatz(
@@ -224,7 +228,7 @@ def solve_with_pce(bqm, n_layers=3, max_iterations=20, alpha=3.0,
                                  population_size=population_size),
         max_iterations=max_iterations,
         alpha=alpha,
-        backend=ParallelSimulator(shots=shots),
+        backend=backend,
     )
 
     print(f"\n   PCE qubits: {pce_solver.n_qubits}  "
@@ -372,6 +376,18 @@ def print_comparison(quantum_result, classical_result):
 if __name__ == "__main__":
     DEMAND = 195  # MW — how much power the grid needs
 
+    # --- Backend selection ---
+    USE_CLOUD = False  # Set to True to use QoroService cloud backend
+
+    if USE_CLOUD:
+        # QoroService reads QORO_API_KEY from your environment
+        # Get your API key at https://dash.qoroquantum.net
+        backend = QoroService(config=JobConfig(shots=10_000))
+        print("☁️  Using QoroService cloud backend")
+    else:
+        backend = ParallelSimulator(shots=10_000)
+        print("💻 Using local ParallelSimulator")
+
     # 1. Define the generators and their constraints
     generators = define_generators()
 
@@ -386,7 +402,7 @@ if __name__ == "__main__":
 
     # 4. Solve with quantum computing
     print("\n🚀 Running quantum solver (PCE-VQE)...")
-    pce_solver = solve_with_pce(bqm)
+    pce_solver = solve_with_pce(bqm, backend=backend)
 
     # 5. Repair the quantum solution to make it fully valid
     result = find_best_repaired_solution(pce_solver, bqm, generators, DEMAND)

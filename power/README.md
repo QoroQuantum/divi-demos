@@ -1,7 +1,7 @@
 # Economic Load Dispatch with Prohibited Operating Zones
 
 Quantum-classical tutorial that solves the Economic Load Dispatch (ELD)
-problem using **Pauli Correlation Encoding (PCE)** on the [Divi](https://pypi.org/project/divi/) quantum SDK.
+problem using **Pauli Correlation Encoding (PCE)** on the [Divi](https://dash.qoroquantum.net) quantum SDK.
 
 ## Quick Start
 

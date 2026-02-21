@@ -76,6 +76,21 @@ Implementation of the Quantum-Guided Cluster Algorithm from [arXiv:2508.10656](h
 
 📓 **[Interactive notebook](./quantum-guided-cluster/quantum_guided_cluster.ipynb)** — step-by-step tutorial
 
+---
+
+### 5. [Economic Load Dispatch](./power)
+
+Quantum-classical solution for the **Economic Load Dispatch (ELD)** problem — dispatching power across generators to meet demand at minimum fuel cost while avoiding Prohibited Operating Zones. Uses **PCE-VQE** with polynomial encoding to compress 12 binary variables into just 5 qubits.
+
+**Key Features:**
+- QUBO formulation for power dispatch with demand and POZ constraints
+- PCE with polynomial encoding (12 variables → 5 qubits)
+- Classical feasibility repair heuristic for quantum candidates
+- Comparison against brute-force classical optimum
+- Support for both local simulation and QoroService cloud execution
+
+📓 **[Interactive notebook](./power/economic_load_dispatch.ipynb)** — step-by-step tutorial
+
 ## License
 
 See [LICENSE](./LICENSE) for details.
