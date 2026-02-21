@@ -1,3 +1,15 @@
+"""
+Partitioned QAOA for MaxCut — Main Script
+==========================================
+Demonstrates how to solve the MaxCut problem on large, community-structured
+graphs using Divi's GraphPartitioningQAOA. The graph is split into smaller
+sub-graphs via spectral clustering, allowing parallel QAOA execution on
+smaller quantum processors or simulators.
+
+Usage:
+    python main.py
+"""
+
 import networkx as nx
 
 from utils import generate_clustered_graph, show_graph, analyze_results

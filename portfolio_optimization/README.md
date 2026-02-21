@@ -20,7 +20,9 @@ For large portfolios (hundreds of assets), the problem is partitioned using spec
 
 ## Files
 
-- **`portfolio_optimization.ipynb`**: Main Jupyter notebook containing the complete workflow, from data loading to solution comparison. This is the primary entry point for exploring the project.
+- **`portfolio_optimization.ipynb`**: Main Jupyter notebook containing the complete QAOA workflow, from data loading to solution comparison. This is the primary entry point for exploring the project.
+
+- **`portfolio_optimization_pce.ipynb`**: Alternative notebook using **Pauli Correlation Encoding (PCE)** instead of QAOA. Demonstrates solving the same portfolio problem with logarithmic qubit compression (e.g., 20 assets → ~5 qubits). Great for understanding PCE's qubit savings trade-offs.
 
 - **`utils.py`**: Utility functions for:
   - Building QUBO matrices from returns and covariance data

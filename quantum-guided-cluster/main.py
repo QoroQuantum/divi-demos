@@ -252,14 +252,14 @@ def run_benchmark(
 
 if __name__ == "__main__":
     results = run_benchmark(
-        n_nodes=18,              # 16 qubits — local simulator.
-        degree=10,               # Dense graph — more frustrated, harder for all methods.
-        qaoa_depths=[1, 2, 3, 5],  # p=2 is the key transition point (see AWS blog / paper Fig. 3).
+        n_nodes=16,              # 16 qubits — local simulator.
+        degree=12,               # Dense graph — more frustrated, harder for all methods.
+        qaoa_depths=[1, 2, 3],  # p=2 is the key transition point (see AWS blog / paper Fig. 3).
         n_iterations_factor=500, # Generous budget — focus on correlation quality.
         n_repetitions=30,        # Enough restarts for statistics.
         lambda_scale=4,          # Cluster link scaling.
         seed=42,
-        use_cloud=True,         # Set True for >18 qubits with QoroService.
+        use_cloud=False,         # Set True for >18 qubits with QoroService.
         shots=10_000,
         output_dir="plots",
     )

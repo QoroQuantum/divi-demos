@@ -1,0 +1,6 @@
+qoro-divi
+networkx
+matplotlib
+numpy
+pennylane
+dimod

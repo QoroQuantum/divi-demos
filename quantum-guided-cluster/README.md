@@ -121,7 +121,7 @@ Edit the `run_benchmark()` call at the bottom of `main.py`:
 To run on larger graphs (>18 qubits) — closer to the paper's 28-node, 100-node
 benchmarks — use Qoro's cloud backend:
 
-1. Obtain an API key from Qoro Quantum.
+1. Obtain an API key from [dash.qoroquantum.net](https://dash.qoroquantum.net).
 2. Set the environment variable:
    ```bash
    export QORO_API_KEY="your_api_key_here"

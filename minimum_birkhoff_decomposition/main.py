@@ -1,3 +1,16 @@
+"""
+VQE-based Minimum Birkhoff Decomposition — Main Script
+=======================================================
+Runs the custom BirkhoffDecomposition VQE to find an approximate Birkhoff
+decomposition of a doubly stochastic matrix. Loads problem instances from
+the Quantum Optimization Benchmarking Library and visualizes results.
+
+Usage:
+    python main.py                          # defaults (n=3, k=2, sparse)
+    python main.py -n 4 -k 2 -inst 5 -it 20
+    python main.py --help                   # see all options
+"""
+
 import argparse
 import json
 import os

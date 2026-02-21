@@ -214,7 +214,7 @@ class BirkhoffDecomposition(VQE):
         self, results: dict[str, dict[str, int]]
     ) -> dict[int, float]:
         losses = {}
-        get_param_id = lambda item: int(item[0].split("_")[0])
+        get_param_id = lambda item: item[0].param_id if hasattr(item[0], 'param_id') else int(str(item[0]).split("_")[0])
 
         for p_idx, param_group in groupby(results.items(), key=get_param_id):
             try:

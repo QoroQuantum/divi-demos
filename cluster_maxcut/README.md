@@ -62,7 +62,7 @@ Quantum Cut Size to Classical Cut Size Ratio = 0.98
 
 The code includes support for Qoro's remote backend. To use it:
 
-1. Obtain an API key from Qoro Quantum.
+1. Obtain an API key from [dash.qoroquantum.net](https://dash.qoroquantum.net).
 1. Set the environment variable:
     ```bash
     export QORO_API_KEY="your_api_key_here"
