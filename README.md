@@ -91,6 +91,22 @@ Quantum-classical solution for the **Economic Load Dispatch (ELD)** problem — 
 
 📓 **[Interactive notebook](./economic_load_dispatch/economic_load_dispatch.ipynb)** — step-by-step tutorial
 
+---
+
+### 6. [Molecular Ground State](./molecular_ground_state)
+
+Potential energy surface of **H₂** computed with VQE. Divi's `MoleculeTransformer` generates molecule variants at different bond lengths, and `VQEHyperparameterSweep` grid-searches over ansätze × geometries in parallel.
+
+**Key Features:**
+- Molecular Hamiltonian from PennyLane's `qml.qchem.Molecule`
+- `MoleculeTransformer` for automated bond-length scanning
+- `VQEHyperparameterSweep` for parallel ansatz × geometry grid search
+- Comparison of UCCSD vs. hardware-efficient ansätze
+- Publication-quality dark-themed PES visualization
+- Support for both local simulation and QoroService cloud execution
+
+📓 **[Interactive notebook](./molecular_ground_state/molecular_ground_state.ipynb)** — step-by-step tutorial
+
 ## License
 
 See [LICENSE](./LICENSE) for details.
