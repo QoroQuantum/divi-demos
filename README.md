@@ -62,7 +62,7 @@ Quantum portfolio optimization using QAOA and PCE combined with spectral partiti
 
 ---
 
-### 4. [Quantum-Guided Cluster Algorithm](./quantum-guided-cluster)
+### 4. [Quantum-Guided Cluster Algorithm](./quantum_guided_cluster)
 
 Implementation of the Quantum-Guided Cluster Algorithm from [arXiv:2508.10656](https://arxiv.org/abs/2508.10656). QAOA is run once to extract two-point correlations ⟨Z_i Z_j⟩, which then guide a classical cluster Monte Carlo for Max-Cut.
 
@@ -74,11 +74,11 @@ Implementation of the Quantum-Guided Cluster Algorithm from [arXiv:2508.10656](h
 - Publication-quality dark-themed visualizations
 - Support for cloud execution via QoroService for >18-qubit instances
 
-📓 **[Interactive notebook](./quantum-guided-cluster/quantum_guided_cluster.ipynb)** — step-by-step tutorial
+📓 **[Interactive notebook](./quantum_guided_cluster/quantum_guided_cluster.ipynb)** — step-by-step tutorial
 
 ---
 
-### 5. [Economic Load Dispatch](./power)
+### 5. [Economic Load Dispatch](./economic_load_dispatch)
 
 Quantum-classical solution for the **Economic Load Dispatch (ELD)** problem — dispatching power across generators to meet demand at minimum fuel cost while avoiding Prohibited Operating Zones. Uses **PCE-VQE** with polynomial encoding to compress 12 binary variables into just 5 qubits.
 
@@ -89,7 +89,7 @@ Quantum-classical solution for the **Economic Load Dispatch (ELD)** problem — 
 - Comparison against brute-force classical optimum
 - Support for both local simulation and QoroService cloud execution
 
-📓 **[Interactive notebook](./power/economic_load_dispatch.ipynb)** — step-by-step tutorial
+📓 **[Interactive notebook](./economic_load_dispatch/economic_load_dispatch.ipynb)** — step-by-step tutorial
 
 ## License
 
