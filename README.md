@@ -102,7 +102,7 @@ Potential energy surface of **H₂** computed with VQE. Divi's `MoleculeTransfor
 - `MoleculeTransformer` for automated bond-length scanning
 - `VQEHyperparameterSweep` for parallel ansatz × geometry grid search
 - Comparison of UCCSD vs. hardware-efficient ansätze
-- Publication-quality dark-themed PES visualization
+- PES visualization
 - Support for both local simulation and QoroService cloud execution
 
 📓 **[Interactive notebook](./molecular_ground_state/molecular_ground_state.ipynb)** — step-by-step tutorial
