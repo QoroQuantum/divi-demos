@@ -11,6 +11,7 @@ Example programs demonstrating quantum algorithms with the [Divi](https://github
 5. [Economic Load Dispatch](#5-economic-load-dispatch) — PCE-VQE for power dispatch
 6. [Molecular Ground State](#6-molecular-ground-state) — VQE for H₂ potential energy surface
 7. [Travelling Salesman Problem](#7-travelling-salesman-problem) — QUBO + QAOA for routing
+8. [Spin Dynamics (TFIM)](#8-spin-dynamics-tfim) — Time Evolution under Hamiltonian dynamics
 
 ## Getting Started
 
@@ -135,6 +136,20 @@ Quantum solution for the **Travelling Salesman Problem (TSP)** — finding the s
 - Support for both local simulation and QoroService cloud execution
 
 📓 **[Interactive notebook](./travelling_salesman/travelling_salesman.ipynb)** — step-by-step tutorial
+
+---
+
+### 8. [Spin Dynamics (TFIM)](./spin_dynamics)
+
+Quantum simulation of spin dynamics using Divi's **TimeEvolution** module. This example simulates a 1D chain of spins (qubits) evolving under the Transverse-Field Ising Model (TFIM) Hamiltonian.
+
+**Key Features:**
+- Demonstration of Divi's `TimeEvolution` API
+- Simulation of **Ferromagnetic** and **Paramagnetic** physical phases
+- Comparison of **Exact Trotterization** (deterministic) vs. **QDrift** (stochastic gate reduction)
+- Beautiful visualization of $\langle Z_0 \rangle$ magnetization over time
+
+📓 **[Interactive notebook](./spin_dynamics/spin_dynamics.ipynb)** — step-by-step tutorial
 
 ## License
 
