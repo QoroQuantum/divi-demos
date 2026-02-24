@@ -41,9 +41,12 @@ Finds the shortest cyclic tour through **N randomly placed cities**:
 2. Enforces constraints via penalty terms:
    - **One city per time step** — exactly one city is visited at each position.
    - **One time step per city** — each city appears exactly once in the tour.
-3. Solves the QUBO with **QAOA** using Divi's `MonteCarloOptimizer`.
-4. Decodes the best feasible bitstring into a tour and compares against a
-   classical brute-force optimum.
+3. Solves the TSP using three unique quantum approaches:
+   - **Direct QAOA:** Solves exactly the uncompressed QUBO mapping for small problems (uses $n^2$ qubits).
+   - **Partitioned QAOA (`QUBOPartitioningQAOA`):** Enables solving classically prohibitive QUBO problems by automatically decomposing the interaction graph into smaller manageable limits, solving them in parallel via Divi, and merging results natively.
+   - **PCE (Pauli Correlation Encoding):** Compress QUBO variables to a base-2 smaller representation ($O(\log(n))$ scaling), reducing the qubit requirements significantly for NISQ devices.
+4. Decodes the quantum outputs, performs a greedy heuristic repair, and compares the relative accuracy versus classical brute-force for all scenarios.
+
 
 ## Files
 
@@ -59,11 +62,11 @@ Edit these constants at the bottom of the script:
 
 | Parameter | Default | Description |
 |-----------|---------|-------------|
-| `N_CITIES` | 4 | Number of cities (keep ≤ 5 for local simulation; n² qubits) |
-| `SEED` | 42 | Random seed for city placement |
-| `N_LAYERS` | 3 | QAOA circuit depth |
-| `MAX_ITERATIONS` | 20 | Optimizer iterations |
-| `SHOTS` | 20 000 | Measurement samples per circuit evaluation |
+| Parameter | Description |
+|-----------|-------------|
+| `N_CITIES_SMALL` | Number of cities for Direct QAOA and PCE (default 4) |
+| `N_CITIES_LARGE` | Number of cities for Partitioned QAOA (default 8) |
+| `USE_CLOUD` | Uses `QoroService` instead of local simulator if set to `True` |
 
 ### Scaling Note
 
@@ -86,15 +89,18 @@ For larger instances, use the QoroService cloud backend.
 3. A side-by-side comparison plot of the classical and quantum tours.
 4. A summary comparing tour distances:
 
-```
-🗺️  Travelling Salesman — Classical vs. Quantum
+```text
+  � Summary — Three Divi Approaches to TSP
 ======================================================================
-   Classical optimum:  tour = [0, 2, 3, 1]
-                       distance = 2.1547
-   QAOA result:        tour = [0, 2, 3, 1]
-                       distance = 2.1547
-   🎉 QAOA found the optimal tour!
-======================================================================
+
+  Method                              Cities   Qubits   Distance    Ratio
+  ───────────────────────────────────────────────────────────────────
+  Classical (brute force)                  4        —     1.9633    1.000
+  A: Direct QAOA                           4       16     1.9633    1.000
+  C: PCE (poly encoding)                   4        6     1.9633    1.000
+
+  Classical (brute force)                  8        —     2.4049    1.000
+  B: Partitioned QAOA                      8      ≤15     4.1914    1.743
 ```
 
 ## Remote Execution (QoroService)

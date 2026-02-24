@@ -126,6 +126,9 @@ Quantum solution for the **Travelling Salesman Problem (TSP)** — finding the s
 **Key Features:**
 - QUBO formulation with n² binary variables (one-hot encoding)
 - Constraint penalties for one-city-per-step and one-step-per-city
+- **Direct QAOA:** Simple implementation for small instances (≤4 cities).
+- **Partitioned QAOA (`QUBOPartitioningQAOA`):** Enables solving classically prohibitive QUBO problems by automatically decomposing the graph into smaller partitions and solving them in parallel via Divi.
+- **PCE (Pauli Correlation Encoding):** Compresses n² QUBO variables into fewer qubits via logarithmic-scale polynomial encoding.
 - Greedy repair heuristic for near-feasible quantum bitstrings
 - Classical brute-force comparison
 - Side-by-side tour visualisation
