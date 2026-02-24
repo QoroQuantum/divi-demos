@@ -10,6 +10,7 @@ Example programs demonstrating quantum algorithms with the [Divi](https://dash.q
 4. [Quantum-Guided Cluster Algorithm](#4-quantum-guided-cluster-algorithm) — QAOA-guided Monte Carlo
 5. [Economic Load Dispatch](#5-economic-load-dispatch) — PCE-VQE for power dispatch
 6. [Molecular Ground State](#6-molecular-ground-state) — VQE for H₂ potential energy surface
+7. [Travelling Salesman Problem](#7-travelling-salesman-problem) — QUBO + QAOA for routing
 
 ## Getting Started
 
@@ -115,6 +116,22 @@ Potential energy surface of **H₂** computed with VQE. Divi's `MoleculeTransfor
 - Support for both local simulation and QoroService cloud execution
 
 📓 **[Interactive notebook](./molecular_ground_state/molecular_ground_state.ipynb)** — step-by-step tutorial
+
+---
+
+### 7. [Travelling Salesman Problem](./travelling_salesman)
+
+Quantum solution for the **Travelling Salesman Problem (TSP)** — finding the shortest route that visits every city exactly once and returns to the start. The TSP is encoded as a **QUBO** using one-hot position encoding and solved with **QAOA**.
+
+**Key Features:**
+- QUBO formulation with n² binary variables (one-hot encoding)
+- Constraint penalties for one-city-per-step and one-step-per-city
+- Greedy repair heuristic for near-feasible quantum bitstrings
+- Classical brute-force comparison
+- Side-by-side tour visualisation
+- Support for both local simulation and QoroService cloud execution
+
+📓 **[Interactive notebook](./travelling_salesman/travelling_salesman.ipynb)** — step-by-step tutorial
 
 ## License
 
