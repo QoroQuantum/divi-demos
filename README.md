@@ -1,6 +1,6 @@
 # Divi Examples
 
-Example programs demonstrating quantum algorithms with the [Divi](https://dash.qoroquantum.net) quantum programming framework.
+Example programs demonstrating quantum algorithms with the [Divi](https://github.com/QoroQuantum/divi) quantum programming framework.
 
 ## Table of Contents
 
