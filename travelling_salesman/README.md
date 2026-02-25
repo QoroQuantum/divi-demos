@@ -108,8 +108,8 @@ For larger instances, use the QoroService cloud backend.
 To run on Qoro's cloud backend:
 
 1. Obtain an API key from [dash.qoroquantum.net](https://dash.qoroquantum.net).
-2. Set the environment variable:
+2. Set the environment variable in a .env file:
     ```bash
-    export QORO_API_KEY="your_api_key_here"
+    QORO_API_KEY="your_api_key_here"
     ```
 3. Set `USE_CLOUD = True` in the script.
