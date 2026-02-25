@@ -60,10 +60,8 @@ Finds the shortest cyclic tour through **N randomly placed cities**:
 
 Edit these constants at the bottom of the script:
 
-| Parameter | Default | Description |
-|-----------|---------|-------------|
 | Parameter | Description |
-|-----------|-------------|
+|-----------|---------|
 | `N_CITIES_SMALL` | Number of cities for Direct QAOA and PCE (default 4) |
 | `N_CITIES_LARGE` | Number of cities for Partitioned QAOA (default 8) |
 | `USE_CLOUD` | Uses `QoroService` instead of local simulator if set to `True` |
