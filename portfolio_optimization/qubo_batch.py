@@ -97,7 +97,7 @@ class QUBOBatch(ProgramBatch):
             program_optimizer = copy.deepcopy(self.optimizer_prototype)
 
             self._programs[prog_id] = self._constructor(
-                job_id=prog_id,
+                program_id=prog_id,
                 problem=qubo,
                 optimizer=program_optimizer,
                 progress_queue=self._queue,

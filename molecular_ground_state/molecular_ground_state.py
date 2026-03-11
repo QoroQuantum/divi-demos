@@ -32,7 +32,7 @@ def build_h2_hamiltonians(
     bond_lengths_angstrom: list[float],
 ) -> dict[float, qml.operation.Operator]:
     """Generate the electronic Hamiltonian of H₂ at each bond length.
-
+ 
     PennyLane's quantum chemistry module computes the second-quantised
     molecular Hamiltonian (in the STO-3G basis) and maps it to qubits
     via the Jordan-Wigner transformation, yielding a 4-qubit operator.
@@ -263,43 +263,84 @@ def plot_pes(pes_data: dict, save_path: str | None = None):
 # =====================================================================
 
 if __name__ == "__main__":
-    # --- Bond length scan ---
-    BOND_LENGTHS = np.linspace(0.3, 2.5, 8).tolist()
+    import time
 
-    # --- Backend selection ---
-    USE_CLOUD = False  # Set to True to use QoroService cloud backend
+    # =================================================================
+    #  PHASE 1 — Local (5 bond lengths, quick scan)
+    # =================================================================
 
-    if USE_CLOUD:
-        # QoroService reads QORO_API_KEY from your environment
-        # Get your API key at https://dash.qoroquantum.net
-        backend = QoroService(config=JobConfig(shots=10_000))
-        print("☁️  Using QoroService cloud backend")
-    else:
-        backend = ParallelSimulator(shots=10_000)
-        print("💻 Using local ParallelSimulator")
+    print("=" * 70)
+    print("  Phase 1 — Local H₂ PES (5 bond lengths, 4 qubits)")
+    print("=" * 70)
 
-    # 1. Build the molecular Hamiltonians at each bond length
-    print(f"\nBuilding H₂ Hamiltonians for {len(BOND_LENGTHS)} bond lengths "
-          f"({min(BOND_LENGTHS):.2f} – {max(BOND_LENGTHS):.2f} Å)...")
-    hamiltonians = build_h2_hamiltonians(BOND_LENGTHS)
+    BOND_LENGTHS_LOCAL = np.linspace(0.3, 2.5, 5).tolist()
+    local_backend = ParallelSimulator(shots=5_000)
+    print("💻 Using local ParallelSimulator")
+
+    # 1. Build Hamiltonians
+    print(f"\nBuilding H₂ Hamiltonians for {len(BOND_LENGTHS_LOCAL)} bond lengths "
+          f"({min(BOND_LENGTHS_LOCAL):.2f} – {max(BOND_LENGTHS_LOCAL):.2f} Å)...")
+    hamiltonians_local = build_h2_hamiltonians(BOND_LENGTHS_LOCAL)
     print(f"  Done — 4 qubits per Hamiltonian")
 
-    # 2. Choose which ansätze to compare
+    # 2. Ansätze
     ansatze = get_ansatze()
     print(f"Ansätze: {[a.name for a in ansatze]}")
 
-    # 3. Run the VQE sweep over all (ansatz × bond_length) combinations
-    sweep = run_sweep(
-        hamiltonians=hamiltonians,
+    # 3. Run VQE sweep
+    t0 = time.time()
+    sweep_local = run_sweep(
+        hamiltonians=hamiltonians_local,
         ansatze=ansatze,
-        n_electrons=2,  # H₂ has 2 electrons
+        n_electrons=2,
         max_iterations=15,
-        backend=backend,
+        backend=local_backend,
     )
+    local_time = time.time() - t0
 
-    # 4. Extract and display the results
-    pes_data = extract_pes_data(sweep)
-    print_results(pes_data, sweep)
+    # 4. Results
+    pes_local = extract_pes_data(sweep_local)
+    print_results(pes_local, sweep_local)
+    plot_pes(pes_local, save_path="h2_pes_local.png")
 
-    # 5. Plot the potential energy surface
-    plot_pes(pes_data, save_path="h2_pes.png")
+    print(f"\n   ⏱️  Phase 1 completed in {local_time:.1f}s")
+
+    # =================================================================
+    #  PHASE 2 — Cloud (12 bond lengths, higher-resolution PES)
+    # =================================================================
+
+    print("\n" + "=" * 70)
+    print("  Phase 2 — High-Resolution PES with QoroService (12 bond lengths)")
+    print("=" * 70)
+
+    BOND_LENGTHS_CLOUD = np.linspace(0.3, 2.5, 12).tolist()
+
+    cloud_backend = QoroService(job_config=JobConfig(shots=10_000))
+    print(f"\n☁️  Dispatching {len(BOND_LENGTHS_CLOUD)} × {len(ansatze)} = "
+          f"{len(BOND_LENGTHS_CLOUD) * len(ansatze)} VQE programs to Qoro Maestro...")
+
+    hamiltonians_cloud = build_h2_hamiltonians(BOND_LENGTHS_CLOUD)
+
+    t0 = time.time()
+    sweep_cloud = run_sweep(
+        hamiltonians=hamiltonians_cloud,
+        ansatze=ansatze,
+        n_electrons=2,
+        max_iterations=25,
+        backend=cloud_backend,
+    )
+    cloud_time = time.time() - t0
+
+    pes_cloud = extract_pes_data(sweep_cloud)
+    print_results(pes_cloud, sweep_cloud)
+    plot_pes(pes_cloud, save_path="h2_pes_cloud.png")
+
+    print(f"\n   ⚡ Local  (Phase 1): {local_time:.1f}s for {len(BOND_LENGTHS_LOCAL)} bond lengths")
+    print(f"   ⚡ Cloud  (Phase 2): {cloud_time:.1f}s for {len(BOND_LENGTHS_CLOUD)} bond lengths")
+
+    print("\n" + "=" * 70)
+    print("  🎉 That's the power of QoroService.")
+    print(f"     {len(BOND_LENGTHS_LOCAL)} → {len(BOND_LENGTHS_CLOUD)} bond lengths, higher fidelity PES.")
+    print("     👉 https://dash.qoroquantum.net")
+    print("=" * 70)
+
