@@ -122,7 +122,6 @@ if __name__ == "__main__":
     cloud_time = time.time() - t0
 
     print(f"\n   ✅ Phase 2 complete in {cloud_time:.1f}s")
-    print(f"   ⚡ Local (Phase 1): {local_time:.1f}s for {n_qubits} nodes")
     print(f"   ⚡ Cloud (Phase 2): {cloud_time:.1f}s for {n_qubits_cloud} nodes")
 
     analyze_results(G_cloud, qaoa_cloud.solution, classical_cut_size_cloud, use_index=False)
