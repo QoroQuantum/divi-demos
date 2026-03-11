@@ -1,71 +1,71 @@
 # Partitioned QAOA for MaxCut using `divi`
 
-This project demonstrates how to solve the **MaxCut** problem on large, community-structured graphs using the `divi` quantum programming framework.
+> 🚀 **Don't choke your local machine.** Qoro is giving away **$100 in free cloud compute credits.**
+> Get your API key at **[dash.qoroquantum.net](https://dash.qoroquantum.net)** to run this at scale.
 
-It specifically showcases **Graph Partitioning**, a technique that splits a large graph (e.g., 50 qubits) into smaller, manageable sub-graphs using spectral clustering. This allows for the execution of Quantum Approximate Optimization Algorithm (QAOA) circuits on smaller quantum processors or simulators in parallel.
+## Why Cloud?
 
-## Project Structure
+A 50-node MaxCut graph needs a **2⁵⁰ statevector** — that's over **8 petabytes of RAM.** Even with clever partitioning, running 10+ QAOA sub-circuits sequentially on your laptop means waiting for each one to finish before the next starts. Qoro's Maestro runs every partition **in parallel**, collapsing hours into minutes.
 
-To run this example, organize your files as follows:
-
-```text
-.
-├── main.py           # The entry point (contains the execution logic)
-├── utils.py          # Helper functions (graph generation, visualization, analysis)
-└── README.md         # This file
-```
-
-## Prerequisites
+## Step 0: Set Your API Key
 
 ```bash
 pip install qoro-divi networkx matplotlib
 ```
 
-## Usage
+Create a `.env` file in the repo root:
 
-### 1. Setup
+```
+QORO_API_KEY="your_api_key_here"
+```
 
-Ensure you have separated the provided code into main.py and utils.py:
+👉 **[Get your free API key →](https://dash.qoroquantum.net)**
 
-- utils.py: Should contain generate_clustered_graph, show_graph, and analyze_results.
-- main.py: Should contain the if __name__ == "__main__": block and imports.
+## How It Works
 
-### 2. Run
+This example uses **graph partitioning** to split a large graph into smaller, manageable sub-graphs using spectral clustering. Each sub-graph is solved independently with QAOA, then results are aggregated.
 
-Run the main script to execute the local simulation:
+### Phase 1 — Local Toy Problem
+
+Runs an 8-node graph locally to prove the algorithm works. This fits easily in your laptop's memory.
+
+### Phase 2 — Scale Up with QoroService
+
+Bumps to a **50-node graph**, which generates 10+ partitions. Each partition is dispatched to QoroService for parallel execution — the kind of workload that would take hours locally.
+
+## Project Structure
+
+```text
+.
+├── main.py           # Two-phase runner (local → cloud)
+├── utils.py          # Graph generation, visualization, analysis
+└── README.md         # This file
+```
+
+## Run
 
 ```bash
 python main.py
 ```
 
-### 3. Expected Output
+## Expected Output
 
-1. A Matplotlib window will open, visualizing the generated graph colors by cluster.
-1. The terminal will log the progress of the partitioned QAOA job.
-1. Finally, the script will compare the Quantum result against a Classical approximation:
+1. **Phase 1:** A small graph visualization and QAOA results completing in seconds.
+2. **Phase 2:** Terminal output showing partitions being routed to Qoro Maestro, followed by a quantum vs. classical comparison.
 
 ```
 Quantum Cut Size to Classical Cut Size Ratio = 0.98
 ```
-(A ratio close to or > 1.0 indicates the quantum solution is competitive with or better than the classical One-Exchange approximation).
 
 ## Configuration
 
 | Parameter            | Description                                                                                     |
 |----------------------|-------------------------------------------------------------------------------------------------|
-| n_qubits             | Total number of nodes in the graph (default: 50).                                               |
-| n_clusters           | Number of dense communities to generate.                                                        |
-| partitioning_config  | Controls how Divi splits the graph, using spectral clustering to minimize cuts between sub-circuits. |
-| optimizer            | Uses MonteCarloOptimizer to find optimal QAOA parameters.                                       |
+| `n_qubits`           | Total number of nodes in the graph.                                                             |
+| `n_clusters`         | Number of dense communities to generate.                                                        |
+| `partitioning_config`| Controls how Divi splits the graph, using spectral clustering.                                  |
+| `optimizer`          | Uses MonteCarloOptimizer to find optimal QAOA parameters.                                       |
 
-## Remote Execution (QoroService)
+---
 
-The code includes support for Qoro's remote backend. To use it:
-
-1. Obtain an API key from [dash.qoroquantum.net](https://dash.qoroquantum.net).
-1. Set the environment variable:
-    ```bash
-    export QORO_API_KEY="your_api_key_here"
-    ```
-1. Uncomment the QoroService lines at the bottom of main.py.
-
+👉 **Ready to go beyond 50 nodes?** [Get your API key](https://dash.qoroquantum.net) and scale with QoroService.

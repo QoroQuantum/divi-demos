@@ -1,41 +1,55 @@
 # Molecular Ground State via VQE using `divi`
 
-This example computes the **potential energy surface (PES)** of the hydrogen molecule (H₂) — ground-state energy as a function of bond length — using the `divi` quantum programming framework.
+> 🚀 **Don't choke your local machine.** Qoro is giving away **$100 in free cloud compute credits.**
+> Get your API key at **[dash.qoroquantum.net](https://dash.qoroquantum.net)** to run this at scale.
 
-It showcases Divi's VQE features:
+## Why Cloud?
 
-- **`VQEHyperparameterSweep`** — runs a grid search over ansätze × Hamiltonians in parallel via `ProgramBatch`
-- **`VQE` with molecular Hamiltonians** — finds the ground-state energy of a qubit Hamiltonian
-- **Multiple ansätze** — compare UCCSD (chemistry gold standard) vs. HardwareEfficient (gate-efficient)
+Computing the H₂ potential energy surface means running **2 ansätze × 12 bond lengths = 24 independent VQE runs.** Each VQE has its own optimizer loop with hundreds of circuit evaluations. Sequentially, that's 24× the wait. QoroService dispatches **all 24 VQE instances in parallel** — same result, a fraction of the time.
 
-## Project Structure
-
-```text
-.
-├── molecular_ground_state.py       # The entry point
-├── molecular_ground_state.ipynb    # Interactive notebook tutorial
-└── README.md                       # This file
-```
-
-## Prerequisites
+## Step 0: Set Your API Key
 
 ```bash
 pip install qoro-divi matplotlib
 ```
 
-## Usage
+Create a `.env` file in the repo root:
 
-### 1. Run
+```
+QORO_API_KEY="your_api_key_here"
+```
+
+👉 **[Get your free API key →](https://dash.qoroquantum.net)**
+
+## What It Does
+
+Computes the **potential energy surface (PES)** of hydrogen (H₂) — ground-state energy as a function of bond length — using Divi's VQE features:
+
+- **`VQEHyperparameterSweep`** — grid search over ansätze × Hamiltonians in parallel
+- **`VQE` with molecular Hamiltonians** — finds the ground-state energy of a qubit Hamiltonian
+- **Multiple ansätze** — compare UCCSD (chemistry gold standard) vs. HardwareEfficient (gate-efficient)
+
+### Phase 1 — Local PES (5 bond lengths)
+
+5 bond lengths × 2 ansätze = 10 VQE runs. Fast enough locally to prove the algorithm works.
+
+### Phase 2 — High-Resolution PES with QoroService (12 bond lengths)
+
+12 bond lengths × 2 ansätze = 24 VQE runs dispatched to QoroService in parallel. Higher resolution PES in a fraction of the time.
+
+## Quick Start
 
 ```bash
 python molecular_ground_state.py
 ```
 
-### 2. Expected Output
+Or explore interactively:
 
-1. The terminal will show VQE progress for each (ansatz, bond_length) combination.
-2. A summary table will print the equilibrium bond length and energy for each ansatz.
-3. A Matplotlib plot will display the H₂ potential energy surface:
+```bash
+jupyter notebook molecular_ground_state.ipynb
+```
+
+## Expected Output
 
 ```
   🔬 Potential Energy Surface — Results
@@ -57,17 +71,12 @@ python molecular_ground_state.py
 
 | Parameter           | Description                                                                      |
 |---------------------|----------------------------------------------------------------------------------|
-| BASE_BOND_LENGTH    | Equilibrium H–H distance in Ångströms (default: 0.74).                           |
-| bond_scale_factors  | Multipliers for the bond length scan (default: 15 points from 0.5× to 3.0×).    |
-| ansatze             | Ansatz circuits to compare: UCCSD, HardwareEfficient, etc.                       |
-| max_iterations      | Optimizer iterations per VQE run (default: 15).                                  |
-| shots               | Measurement samples per circuit (default: 10,000).                               |
+| `BOND_LENGTHS_LOCAL`| Local bond length scan (default: 5 points, 0.3–2.5 Å).                          |
+| `BOND_LENGTHS_CLOUD`| Cloud bond length scan (default: 12 points, 0.3–2.5 Å).                         |
+| `ansatze`           | Ansatz circuits to compare: UCCSD, GenericLayer, etc.                            |
+| `max_iterations`    | Optimizer iterations per VQE run (15 local, 25 cloud).                           |
+| `shots`             | Measurement samples per circuit (5k local, 10k cloud).                           |
 
-## Remote Execution (QoroService)
+---
 
-1. Obtain an API key from [dash.qoroquantum.net](https://dash.qoroquantum.net).
-2. Set the environment variable:
-    ```bash
-    export QORO_API_KEY="your_api_key_here"
-    ```
-3. Change `USE_CLOUD = True` in `molecular_ground_state.py`.
+👉 **Ready for larger molecules?** [Get your API key](https://dash.qoroquantum.net) and scale with QoroService.

@@ -24,7 +24,7 @@ import numpy as np
 from divi.backends import ParallelSimulator
 from divi.qprog import QAOA, GraphProblem
 from divi.qprog.optimizers import PymooOptimizer, PymooMethod
-from divi.qprog import QDrift
+from divi.hamiltonians import QDrift
 
 
 # ──────────────────────────────────────────────────────────────────
@@ -529,7 +529,7 @@ def extract_pce_correlations(
     # First create PCE without n_electrons to discover n_qubits,
     # then set n_electrons (UCCSD requires n_electrons < n_qubits, even).
     pce_instance = PCE(
-        qubo_matrix=Q,
+        Q,
         encoding_type=encoding_type,
         alpha=alpha,
         n_layers=2,

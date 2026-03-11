@@ -10,13 +10,13 @@
 # =============================================================================
 
 import dimod
-import numpy as np
 import pennylane as qml
+import time
 
 from divi.backends import ParallelSimulator, QoroService, JobConfig
 from divi.qprog import PCE, GenericLayerAnsatz
 from divi.qprog.optimizers import PymooMethod, PymooOptimizer
-from divi.qprog.typing import qubo_to_matrix
+from divi.typing import qubo_to_matrix
 
 
 # ─────────────────────────────────────────────────────────────────────
@@ -48,6 +48,32 @@ def define_generators():
             "name": "Gen 3", "a": 25, "b": 1.8, "c": 0.015,
             "P_min": 30, "P_max": 105,
             "poz_low": 50, "poz_high": 65,
+        },
+    ]
+
+
+
+def define_generators_large():
+    """Define a 6-generator grid (Phase 2 — cloud scale-up).
+
+    Double the generators: 24 binary variables → ~8 PCE qubits.
+    QoroService parallelises the circuit evaluations on Maestro.
+    """
+    return define_generators() + [
+        {
+            "name": "Gen 4", "a": 18, "b": 1.7, "c": 0.012,
+            "P_min": 35, "P_max": 110,
+            "poz_low": 55, "poz_high": 70,
+        },
+        {
+            "name": "Gen 5", "a": 22, "b": 2.2, "c": 0.009,
+            "P_min": 50, "P_max": 120,
+            "poz_low": 65, "poz_high": 80,
+        },
+        {
+            "name": "Gen 6", "a": 12, "b": 1.3, "c": 0.018,
+            "P_min": 25, "P_max": 90,
+            "poz_low": 45, "poz_high": 60,
         },
     ]
 
@@ -184,6 +210,35 @@ def classical_brute_force(generators, demand, bqm):
     return best
 
 
+def classical_sa_solve(generators, demand, bqm, num_reads=1000):
+    """Classical simulated annealing baseline — works for any number of generators."""
+    sampler = dimod.SimulatedAnnealingSampler()
+    sampleset = sampler.sample(bqm, num_reads=num_reads)
+
+    best = None
+    for sample, energy in sampleset.data(["sample", "energy"]):
+        powers = []
+        valid = True
+        for g, gen in enumerate(generators):
+            p = gen["P_min"] + STEP_MW * sum(
+                BIT_WEIGHTS[b] * sample.get(_qubit_name(g, b), 0)
+                for b in range(N_QUBITS_PER_GEN)
+            )
+            if gen["poz_low"] <= p <= gen["poz_high"]:
+                valid = False
+                break
+            powers.append(p)
+
+        if not valid or abs(sum(powers) - demand) > STEP_MW:
+            continue
+
+        cost = sum(fuel_cost(gen, p) for gen, p in zip(generators, powers))
+        if best is None or cost < best[-1]:
+            best = tuple(powers) + (cost,)
+
+    return best
+
+
 # ─────────────────────────────────────────────────────────────────────
 #  STEP 4 — Solve with quantum computing (PCE-VQE)
 # ─────────────────────────────────────────────────────────────────────
@@ -220,7 +275,7 @@ def solve_with_pce(bqm, n_layers=3, max_iterations=20, alpha=3.0,
     )
 
     pce_solver = PCE(
-        qubo_matrix=qubo_mat,
+        qubo_mat,
         ansatz=ansatz,
         n_layers=n_layers,
         encoding_type="poly",
@@ -350,15 +405,16 @@ def find_best_repaired_solution(pce_solver, bqm, generators, demand, top_n=20):
 def print_comparison(quantum_result, classical_result):
     """Print a side-by-side comparison of quantum and classical solutions."""
     q_powers, q_cost, q_prob = quantum_result
-    c_p1, c_p2, c_p3, c_cost = classical_result
+    c_powers, c_cost = classical_result[:-1], classical_result[-1]
+
+    c_str = ", ".join(f"P{i+1}={p:.0f}" for i, p in enumerate(c_powers))
+    q_str = ", ".join(f"P{i+1}={p:.0f}" for i, p in enumerate(q_powers))
 
     print("\n" + "=" * 70)
     print("  🔬 Quantum vs Classical Comparison")
     print("=" * 70)
-    print(f"\n   Classical optimum:  P1={c_p1}, P2={c_p2}, P3={c_p3} MW"
-          f"  → Cost = {c_cost:.1f} $")
-    print(f"   PCE-VQE result:     P1={q_powers[0]:.0f}, P2={q_powers[1]:.0f},"
-          f" P3={q_powers[2]:.0f} MW  → Cost = {q_cost:.1f} $")
+    print(f"\n   Classical optimum:  {c_str} MW  → Cost = {c_cost:.1f} $")
+    print(f"   PCE-VQE result:     {q_str} MW  → Cost = {q_cost:.1f} $")
 
     if abs(q_cost - c_cost) < 0.1:
         print("\n   🎉 PCE-VQE found the global optimum!")
@@ -382,7 +438,7 @@ if __name__ == "__main__":
     if USE_CLOUD:
         # QoroService reads QORO_API_KEY from your environment
         # Get your API key at https://dash.qoroquantum.net
-        backend = QoroService(config=JobConfig(shots=10_000))
+        backend = QoroService(job_config=JobConfig(shots=10_000))
         print("☁️  Using QoroService cloud backend")
     else:
         backend = ParallelSimulator(shots=10_000)
@@ -402,7 +458,9 @@ if __name__ == "__main__":
 
     # 4. Solve with quantum computing
     print("\n🚀 Running quantum solver (PCE-VQE)...")
+    t0 = time.time()
     pce_solver = solve_with_pce(bqm, backend=backend)
+    local_time = time.time() - t0
 
     # 5. Repair the quantum solution to make it fully valid
     result = find_best_repaired_solution(pce_solver, bqm, generators, DEMAND)
@@ -417,3 +475,58 @@ if __name__ == "__main__":
         print_comparison(result, classical_best)
     else:
         print("\n   ⚠️  No valid solution found. Try increasing max_iterations.")
+
+    # =================================================================
+    #  PHASE 2 — 6 Generators with QoroService
+    # =================================================================
+
+    print("\n" + "=" * 70)
+    print("  Phase 2 — 6 Generators with QoroService (24 binary vars, ~8 PCE qubits)")
+    print("=" * 70)
+
+    generators_large = define_generators_large()
+    DEMAND_LARGE = 390  # MW — scales with added capacity
+
+    bqm_large, var_names_large = build_qubo(generators_large, demand=DEMAND_LARGE)
+    print(f"Built QUBO: {len(var_names_large)} variables "
+          f"(was {len(var_names)}) — {len(bqm_large.quadratic)} interactions")
+
+    classical_large = classical_sa_solve(generators_large, DEMAND_LARGE, bqm_large, num_reads=100)
+    if classical_large:
+        print(f"Classical SA baseline: Cost = {classical_large[-1]:.1f} $")
+
+    cloud_backend = QoroService(job_config=JobConfig(shots=10_000))
+    print("\n☁️  Dispatching 6-generator PCE-VQE to Qoro Maestro...")
+    print(f"   {len(var_names_large)} binary vars encoded into fewer PCE qubits in parallel")
+
+    t0 = time.time()
+    pce_solver_cloud = solve_with_pce(
+        bqm_large,
+        n_layers=3,
+        max_iterations=10,
+        population_size=50,
+        backend=cloud_backend,
+    )
+    cloud_time = time.time() - t0
+
+    result_cloud = find_best_repaired_solution(
+        pce_solver_cloud, bqm_large, generators_large, DEMAND_LARGE
+    )
+
+    if result_cloud is not None:
+        powers, cost, prob = result_cloud
+        gen_str = ", ".join(f"P{i+1}={p:.0f}" for i, p in enumerate(powers))
+        print(f"\n   → Best repaired solution: {gen_str} MW")
+        print(f"     Total={sum(powers):.0f} MW, Cost={cost:.1f} $, "
+              f"quantum seed prob={prob:.2%}")
+        if classical_large:
+            print_comparison(result_cloud, classical_large)
+
+    print(f"\n   ⚡ Local  (Phase 1): {local_time:.1f}s for 3 generators ({len(var_names)} vars)")
+    print(f"   ⚡ Cloud  (Phase 2): {cloud_time:.1f}s for 6 generators ({len(var_names_large)} vars)")
+
+    print("\n" + "=" * 70)
+    print("  🎉 That's the power of QoroService.")
+    print("     Double the generators, cloud-parallel PCE-VQE on Maestro.")
+    print("     👉 https://dash.qoroquantum.net")
+    print("=" * 70)

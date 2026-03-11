@@ -214,7 +214,7 @@ def main(args):
     if OPTIMIZER_TYPE == "Cobyla":
         optimizer = ScipyOptimizer(ScipyMethod.COBYLA)
     elif OPTIMIZER_TYPE == "MonteCarlo":
-        optimizer = MonteCarloOptimizer(n_param_sets=20, n_best_sets=5)
+        optimizer = MonteCarloOptimizer(population_size=20, n_best_sets=5)
     else:
         raise ValueError(f"Unsupported optimizer type: {OPTIMIZER_TYPE}")
 

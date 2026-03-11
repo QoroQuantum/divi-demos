@@ -8,7 +8,6 @@ Generates publication-quality dark-themed plots:
   4. Energy distribution violin plots
 """
 
-import matplotlib.colors as mcolors
 import matplotlib.pyplot as plt
 import networkx as nx
 import numpy as np

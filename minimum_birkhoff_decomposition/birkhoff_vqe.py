@@ -31,49 +31,56 @@ def black_box_optimizer(
     # Use the pre-selected and pre-flattened permutation matrices
     selected_perms_flat = all_permutation_matrices_flat[list(combination_ids)]
 
-    # Step 1: Integer Optimization
-    integer_model = Model(name="integer_approximation")
-    integer_model.parameters.threads = 2
+    try:
+        # Step 1: Integer Optimization
+        integer_model = Model(name="integer_approximation")
+        integer_model.parameters.threads = 2
 
-    u = integer_model.integer_var_list(k, name="u")
-    integer_model.add_constraint(integer_model.sum(u) == scale)
-    for i in range(k):
-        integer_model.add_constraint(u[i] >= 0)
-        integer_model.add_constraint(u[i] <= scale)
+        u = integer_model.integer_var_list(k, name="u")
+        integer_model.add_constraint(integer_model.sum(u) == scale)
+        for i in range(k):
+            integer_model.add_constraint(u[i] >= 0)
+            integer_model.add_constraint(u[i] <= scale)
 
-    reconstructed_matrix_flat = u @ selected_perms_flat
-    target_matrix_flat = target_matrix.flatten()
-    error_expr = integer_model.sum_squares(
-        target_matrix_flat[i] - reconstructed_matrix_flat[i] for i in range(n * n)
-    )
-    integer_model.minimize(error_expr)
-    integer_solution = integer_model.solve()
-    if not integer_solution:
-        return k + 1, float("inf"), None
-    min_error_found = integer_solution.get_objective_value()
+        reconstructed_matrix_flat = u @ selected_perms_flat
+        target_matrix_flat = target_matrix.flatten()
+        error_expr = integer_model.sum_squares(
+            target_matrix_flat[i] - reconstructed_matrix_flat[i] for i in range(n * n)
+        )
+        integer_model.minimize(error_expr)
+        integer_solution = integer_model.solve()
+        if not integer_solution:
+            return k + 1, float("inf"), None
+        min_error_found = integer_solution.get_objective_value()
 
-    # Step 2: Sparsification
-    continuous_model = Model(name="sparsification")
-    continuous_model.parameters.threads = 2
+        # Step 2: Sparsification
+        continuous_model = Model(name="sparsification")
+        continuous_model.parameters.threads = 2
 
-    c = continuous_model.continuous_var_list(k, name="c")
-    y = continuous_model.binary_var_list(k, name="y")
-    continuous_model.add_constraint(continuous_model.sum(c) == 1)
-    for i in range(k):
-        continuous_model.add_constraint(c[i] >= 0)
-        continuous_model.add_constraint(c[i] <= y[i])
+        c = continuous_model.continuous_var_list(k, name="c")
+        y = continuous_model.binary_var_list(k, name="y")
+        continuous_model.add_constraint(continuous_model.sum(c) == 1)
+        for i in range(k):
+            continuous_model.add_constraint(c[i] >= 0)
+            continuous_model.add_constraint(c[i] <= y[i])
 
-    reconstructed_matrix_flat_c = c @ selected_perms_flat
-    target_matrix_unscaled_flat = target_matrix.flatten() / scale
-    error_expr_c = continuous_model.sum_squares(
-        target_matrix_unscaled_flat[i] - reconstructed_matrix_flat_c[i]
-        for i in range(n * n)
-    )
-    continuous_model.add_constraint(error_expr_c <= min_error_found / (scale**2) + 1e-9)
-    continuous_model.minimize(continuous_model.sum(y))
-    continuous_solution = continuous_model.solve()
-    if not continuous_solution:
-        return k + 1, float("inf"), None
+        reconstructed_matrix_flat_c = c @ selected_perms_flat
+        target_matrix_unscaled_flat = target_matrix.flatten() / scale
+        error_expr_c = continuous_model.sum_squares(
+            target_matrix_unscaled_flat[i] - reconstructed_matrix_flat_c[i]
+            for i in range(n * n)
+        )
+        continuous_model.add_constraint(error_expr_c <= min_error_found / (scale**2) + 1e-9)
+        continuous_model.minimize(continuous_model.sum(y))
+        continuous_solution = continuous_model.solve()
+        if not continuous_solution:
+            return k + 1, float("inf"), None
+    except Exception as e:
+        if "CPLEX" in str(e) or "runtime" in str(e).lower():
+            raise RuntimeError(
+                "CPLEX runtime not found. Please install it with:  pip install cplex"
+            ) from e
+        raise
 
     continuous_weights = continuous_solution.get_value_list(c)
 
@@ -270,12 +277,9 @@ class BirkhoffDecomposition(VQE):
         print("\n--- Performing Final Computation ---")
         self.reporter.info(message="Running final circuit")
 
-        self.circuits[:] = []
-        self._curr_params = self.final_params
-        self._generate_circuits()
-        backend_output = self._prepare_and_send_circuits()
-        results = {r["label"]: r["results"] for r in backend_output}
-        shots_dict = list(results.values())[0]
+        self._curr_params = np.atleast_2d(self.final_params)
+        self._run_solution_measurement()
+        shots_dict = next(iter(self._best_probs.values()))
 
         self.final_measurement_outcomes = shots_dict
 

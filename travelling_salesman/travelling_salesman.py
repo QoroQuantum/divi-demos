@@ -627,7 +627,7 @@ def solve_with_pce(
     import pennylane as qml
     from divi.qprog import PCE, GenericLayerAnsatz
     from divi.qprog.optimizers import PymooMethod, PymooOptimizer
-    from divi.qprog.typing import qubo_to_matrix
+    from divi.typing import qubo_to_matrix
 
     if backend is None:
         backend = ParallelSimulator(shots=shots)
@@ -642,7 +642,7 @@ def solve_with_pce(
     )
 
     pce_solver = PCE(
-        qubo_matrix=qubo_mat,
+        qubo_mat,
         ansatz=ansatz,
         n_layers=n_layers,
         encoding_type=encoding_type,
@@ -708,7 +708,7 @@ if __name__ == "__main__":
     SHOTS = 20_000
 
     if USE_CLOUD:
-        backend = QoroService(config=JobConfig(qpu_system="qoro_maestro", shots=SHOTS))
+        backend = QoroService(job_config=JobConfig(qpu_system="qoro_maestro", shots=SHOTS))
         print("☁️  Using QoroService cloud backend")
     else:
         backend = ParallelSimulator(shots=SHOTS)
