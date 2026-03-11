@@ -136,7 +136,7 @@ Every example in this repo works locally on small problems. But when you're read
 1. **[Get your free API key](https://dash.qoroquantum.net)** — $100 in credits, no credit card required
 2. `pip install qoro-divi`
 3. Set `QORO_API_KEY` in your environment
-4. Change one line: `backend = QoroService(config=JobConfig(shots=10_000))`
+4. Change one line: `backend = QoroService(job_config=JobConfig(shots=10_000))`
 
 **That's it.** Same code, cloud scale.
 
