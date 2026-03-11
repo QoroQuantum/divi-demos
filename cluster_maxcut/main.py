@@ -32,10 +32,10 @@ from divi.backends import QoroService, ParallelSimulator, JobConfig
 
 if __name__ == "__main__":
 
-    n_qubits = 50
-    n_clusters = 5
-    inter_edges = 5
-    p_intra = 0.2
+    n_qubits = 20
+    n_clusters = 4
+    inter_edges = 10
+    p_intra = 0.3
     seed = 42
 
     G, node_to_cluster, clusters = generate_clustered_graph(
@@ -57,8 +57,10 @@ if __name__ == "__main__":
 
     # Set up the partitioning approach
     partition_config = PartitioningConfig(
-        minimum_n_clusters=10, partitioning_algorithm="spectral"
+        minimum_n_clusters=4, partitioning_algorithm="spectral"
     )
+
+    t0 = time.time()
 
     qaoa_problem = GraphPartitioningQAOA(
         graph=G,
@@ -73,6 +75,7 @@ if __name__ == "__main__":
     qaoa_problem.create_programs()
     qaoa_problem.run(blocking=True)
     qaoa_problem.aggregate_results()
+    local_time = time.time() - t0
 
     analyze_results(G, qaoa_problem.solution, classical_cut_size, use_index=False)
 
