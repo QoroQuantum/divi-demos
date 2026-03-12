@@ -1,6 +1,6 @@
 # Divi Examples
 
-> 🚀 **Don't choke your local machine.** Qoro is giving away **$100 in free cloud compute credits.**
+> 🚀 **Skip the local bottleneck.** Qoro is giving away **$100 in free cloud compute credits.**
 > Get your API key at **[dash.qoroquantum.net](https://dash.qoroquantum.net)** to run these tutorials at scale.
 
 Example programs demonstrating quantum algorithms with the [Divi](https://github.com/QoroQuantum/divi) quantum programming framework — each structured as a **two-phase tutorial** showing the jump from local toy problems to cloud-scale execution on [QoroService](https://dash.qoroquantum.net).
@@ -100,8 +100,8 @@ Quantum-classical solution for the **Economic Load Dispatch (ELD)** problem usin
 
 Potential energy surface of **H₂** computed with VQE. Divi's `VQEHyperparameterSweep` grid-searches over ansätze × geometries in parallel.
 
-**The bottleneck:** 2 ansätze × 15 bond lengths = 30 independent VQE runs. Sequentially, that's 30× the wait.
-**The fix:** QoroService dispatches all 30 VQE instances in parallel — same result, fraction of the time.
+**The bottleneck:** 2 ansätze × 12 bond lengths = 24 independent VQE runs. Sequentially, that's 24× the wait.
+**The fix:** QoroService dispatches all 24 VQE instances in parallel — same result, fraction of the time.
 
 📓 **[Interactive notebook](./molecular_ground_state/molecular_ground_state.ipynb)** — step-by-step tutorial
 

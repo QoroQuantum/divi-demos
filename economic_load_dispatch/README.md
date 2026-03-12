@@ -1,6 +1,6 @@
 # Economic Load Dispatch with Prohibited Operating Zones
 
-> 🚀 **Don't choke your local machine.** Qoro is giving away **$100 in free cloud compute credits.**
+> 🚀 **Skip the local bottleneck.** Qoro is giving away **$100 in free cloud compute credits.**
 > Get your API key at **[dash.qoroquantum.net](https://dash.qoroquantum.net)** to run this at scale.
 
 ## Why Cloud?
