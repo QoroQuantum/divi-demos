@@ -514,9 +514,9 @@ def print_comparison(
 def solve_partitioned_tsp(
     bqm: dimod.BinaryQuadraticModel,
     dist_matrix: np.ndarray,
-    decomposer_size: int = 15,
+    decomposer_size: int = 25,
     n_layers: int = 2,
-    max_iterations: int = 10,
+    max_iterations: int = 15,
     shots: int = 10_000,
     backend=None,
 ) -> tuple[list[int], float]:
@@ -740,7 +740,7 @@ if __name__ == "__main__":
           f"distance = {classical_dist_small:.4f}")
 
     print("\n🚀 Running direct QAOA...")
-    qaoa = solve_with_qaoa(bqm_small, n_layers=3, max_iterations=20,
+    qaoa = solve_with_qaoa(bqm_small, n_layers=3, max_iterations=10,
                            shots=SHOTS, backend=backend)
     result_small = extract_best_tour(qaoa, bqm_small, dist_small)
 
