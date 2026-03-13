@@ -226,7 +226,7 @@ def phase_run(args):
     USE_CLOUD = True
     local_backend = ParallelSimulator(shots=SHOTS, track_depth=True)
     if USE_CLOUD:
-        cloud_backend = QoroService(job_config=JobConfig(qpu_system="superconducting_qpus", shots=SHOTS, force_sampling=True))
+        cloud_backend = QoroService(job_config=JobConfig(shots=SHOTS, force_sampling=True))
         print("☁️  Cloud backend: QoroService (superconducting_qpus)")
     else:
         cloud_backend = None

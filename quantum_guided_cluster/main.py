@@ -108,7 +108,7 @@ def run_benchmark(
     # --- Backend setup ---
     if use_cloud:
         from divi.backends import QoroService, JobConfig
-        backend = QoroService(job_config=JobConfig(qpu_system="qoro_maestro", shots=shots))
+        backend = QoroService(job_config=JobConfig(shots=shots))
         print(f"\n☁️  Using QoroService backend (shots={shots})")
     else:
         backend = ParallelSimulator(shots=shots)

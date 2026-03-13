@@ -708,7 +708,7 @@ if __name__ == "__main__":
     SHOTS = 20_000
 
     if USE_CLOUD:
-        backend = QoroService(job_config=JobConfig(qpu_system="qoro_maestro", shots=SHOTS))
+        backend = QoroService(job_config=JobConfig(shots=SHOTS))
         print("☁️  Using QoroService cloud backend")
     else:
         backend = ParallelSimulator(shots=SHOTS)
