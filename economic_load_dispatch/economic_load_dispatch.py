@@ -13,7 +13,7 @@ import dimod
 import pennylane as qml
 import time
 
-from divi.backends import ParallelSimulator, QoroService, JobConfig
+from divi.backends import QiskitSimulator, QoroService, JobConfig
 from divi.qprog import PCE, GenericLayerAnsatz
 from divi.qprog.optimizers import PymooMethod, PymooOptimizer
 from divi.typing import qubo_to_matrix
@@ -264,7 +264,7 @@ def solve_with_pce(bqm, n_layers=3, max_iterations=20, alpha=3.0,
         pce_solver:  the solved PCE object (access .solution, .get_top_solutions)
     """
     if backend is None:
-        backend = ParallelSimulator(shots=shots)
+        backend = QiskitSimulator(shots=shots)
 
     qubo_mat = qubo_to_matrix(bqm)
 
@@ -441,8 +441,8 @@ if __name__ == "__main__":
         backend = QoroService(job_config=JobConfig(shots=10_000))
         print("☁️  Using QoroService cloud backend")
     else:
-        backend = ParallelSimulator(shots=10_000)
-        print("💻 Using local ParallelSimulator")
+        backend = QiskitSimulator(shots=10_000)
+        print("💻 Using local QiskitSimulator")
 
     # 1. Define the generators and their constraints
     generators = define_generators()

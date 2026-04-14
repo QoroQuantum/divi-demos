@@ -37,7 +37,7 @@ from plotting import (
 )
 
 import matplotlib.pyplot as plt
-from divi.backends import ParallelSimulator
+from divi.backends import QiskitSimulator
 
 
 def run_pce_benchmark(
@@ -104,8 +104,8 @@ def run_pce_benchmark(
         backend = QoroService(job_config=JobConfig(shots=shots))
         print(f"\n☁️  Using QoroService backend (shots={shots})")
     else:
-        backend = ParallelSimulator(shots=shots)
-        print(f"\n💻 Using local ParallelSimulator (shots={shots})")
+        backend = QiskitSimulator(shots=shots)
+        print(f"\n💻 Using local QiskitSimulator (shots={shots})")
 
     # ─── Method results collector ───
     methods = {}  # name -> (result, qubit_count, elapsed, correlation_label)

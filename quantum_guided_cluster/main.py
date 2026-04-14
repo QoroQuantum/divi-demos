@@ -32,7 +32,7 @@ from plotting import (
     plot_energy_distribution,
 )
 
-from divi.backends import ParallelSimulator
+from divi.backends import QiskitSimulator
 
 
 def run_benchmark(
@@ -111,8 +111,8 @@ def run_benchmark(
         backend = QoroService(job_config=JobConfig(shots=shots))
         print(f"\n☁️  Using QoroService backend (shots={shots})")
     else:
-        backend = ParallelSimulator(shots=shots)
-        print(f"\n💻 Using ParallelSimulator backend (shots={shots})")
+        backend = QiskitSimulator(shots=shots)
+        print(f"\n💻 Using QiskitSimulator backend (shots={shots})")
 
     # ─── Run all methods ───
     # 1. Simulated Annealing

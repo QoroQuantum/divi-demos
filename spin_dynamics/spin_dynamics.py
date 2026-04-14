@@ -25,7 +25,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pennylane as qml
 
-from divi.backends import ParallelSimulator, QoroService, JobConfig
+from divi.backends import QiskitSimulator, QoroService, JobConfig
 from divi.hamiltonians import ExactTrotterization, QDrift
 from divi.qprog import TimeEvolutionTrajectory
 
@@ -131,8 +131,8 @@ if __name__ == "__main__":
         backend = QoroService(job_config=JobConfig(shots=SHOTS))
         print("☁️  Using QoroService cloud backend")
     else:
-        backend = ParallelSimulator(shots=SHOTS)
-        print("💻 Using local ParallelSimulator")
+        backend = QiskitSimulator(shots=SHOTS)
+        print("💻 Using local QiskitSimulator")
 
     # TimeEvolutionTrajectory needs t > 0 — we skip t=0
     time_points = np.linspace(0.01, T_MAX, N_POINTS).tolist()

@@ -21,8 +21,9 @@ from dataclasses import dataclass, field
 import networkx as nx
 import numpy as np
 
-from divi.backends import ParallelSimulator
-from divi.qprog import QAOA, GraphProblem
+from divi.backends import QiskitSimulator
+from divi.qprog import QAOA
+from divi.qprog.problems import MaxCutProblem
 from divi.qprog.optimizers import PymooOptimizer, PymooMethod
 from divi.hamiltonians import QDrift
 
@@ -101,12 +102,11 @@ def extract_qaoa_correlations(
     n = G.number_of_nodes()
 
     if backend is None:
-        backend = ParallelSimulator(shots=shots)
+        backend = QiskitSimulator(shots=shots)
 
     # Build the QAOA kwargs
     qaoa_kwargs = dict(
-        problem=G,
-        graph_problem=GraphProblem.MAXCUT,
+        problem=MaxCutProblem(G),
         n_layers=n_layers,
         optimizer=PymooOptimizer(method=PymooMethod.DE, population_size=20),
         max_iterations=max_iterations,
@@ -524,7 +524,7 @@ def extract_pce_correlations(
     Q = maxcut_to_qubo(G)
 
     if backend is None:
-        backend = ParallelSimulator(shots=shots)
+        backend = QiskitSimulator(shots=shots)
 
     # First create PCE without n_electrons to discover n_qubits,
     # then set n_electrons (UCCSD requires n_electrons < n_qubits, even).

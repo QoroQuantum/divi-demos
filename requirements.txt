@@ -1,4 +1,4 @@
-qoro-divi==0.9.0
+qoro-divi==0.10.0
 networkx
 matplotlib
 numpy

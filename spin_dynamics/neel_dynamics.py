@@ -25,7 +25,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pennylane as qml
 
-from divi.backends import ParallelSimulator, QoroService, JobConfig
+from divi.backends import QiskitSimulator, QoroService, JobConfig
 from divi.circuits import circuit_body_to_qasm
 from divi.qprog import TimeEvolution
 from divi.hamiltonians import ExactTrotterization, QDrift
@@ -224,7 +224,7 @@ def phase_run(args):
 
     # --- Backends ---
     USE_CLOUD = True
-    local_backend = ParallelSimulator(shots=SHOTS, track_depth=True)
+    local_backend = QiskitSimulator(shots=SHOTS, track_depth=True)
     if USE_CLOUD:
         cloud_backend = QoroService(job_config=JobConfig(shots=SHOTS, force_sampling=True))
         print("☁️  Cloud backend: QoroService (superconducting_qpus)")

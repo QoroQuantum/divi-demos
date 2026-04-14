@@ -13,7 +13,7 @@ import numpy as np
 import pennylane as qml
 import matplotlib.pyplot as plt
 
-from divi.backends import ParallelSimulator, QoroService, JobConfig
+from divi.backends import QiskitSimulator, QoroService, JobConfig
 
 from divi.qprog import (
     VQE,
@@ -112,7 +112,7 @@ def run_sweep(
         The completed VQEHyperparameterSweep instance.
     """
     if backend is None:
-        backend = ParallelSimulator(shots=shots)
+        backend = QiskitSimulator(shots=shots)
 
     sweep = VQEHyperparameterSweep(
         ansatze=ansatze,
@@ -274,8 +274,8 @@ if __name__ == "__main__":
     print("=" * 70)
 
     BOND_LENGTHS_LOCAL = np.linspace(0.3, 2.5, 5).tolist()
-    local_backend = ParallelSimulator(shots=5_000)
-    print("💻 Using local ParallelSimulator")
+    local_backend = QiskitSimulator(shots=5_000)
+    print("💻 Using local QiskitSimulator")
 
     # 1. Build Hamiltonians
     print(f"\nBuilding H₂ Hamiltonians for {len(BOND_LENGTHS_LOCAL)} bond lengths "

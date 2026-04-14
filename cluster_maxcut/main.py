@@ -16,18 +16,16 @@ import networkx as nx
 
 from utils import generate_clustered_graph, show_graph, analyze_results
 
-from divi.qprog.algorithms import GraphProblem
+from divi.qprog.problems import MaxCutProblem
+from divi.qprog.problems._graph_partitioning_utils import GraphPartitioningConfig
 
 from divi.qprog.optimizers import (
     MonteCarloOptimizer,
 )
 
-from divi.qprog import (
-    GraphPartitioningQAOA,
-    PartitioningConfig,
-)
+from divi.qprog import QAOA
 
-from divi.backends import QoroService, ParallelSimulator, JobConfig
+from divi.backends import QoroService, QiskitSimulator, JobConfig
 
 
 if __name__ == "__main__":
@@ -56,20 +54,18 @@ if __name__ == "__main__":
     optim = MonteCarloOptimizer(population_size=50, n_best_sets=5)
 
     # Set up the partitioning approach
-    partition_config = PartitioningConfig(
+    partition_config = GraphPartitioningConfig(
         minimum_n_clusters=4, partitioning_algorithm="spectral"
     )
 
     t0 = time.time()
 
-    qaoa_problem = GraphPartitioningQAOA(
-        graph=G,
-        graph_problem=GraphProblem.MAXCUT,
+    qaoa_problem = QAOA(
+        problem=MaxCutProblem(graph=G, config=partition_config),
         n_layers=2,
         optimizer=optim,
-        partitioning_config=partition_config,
         max_iterations=5,
-        backend=ParallelSimulator(),
+        backend=QiskitSimulator(),
         grouping_strategy="qwc",
     )
     qaoa_problem.create_programs()
@@ -99,7 +95,7 @@ if __name__ == "__main__":
 
     classical_cut_size_cloud, _ = nx.approximation.one_exchange(G_cloud, seed=1)
 
-    partition_config_cloud = PartitioningConfig(
+    partition_config_cloud = GraphPartitioningConfig(
         max_n_nodes_per_cluster=15, partitioning_algorithm="spectral"
     )
 
@@ -109,12 +105,10 @@ if __name__ == "__main__":
     print(f"   Partitioning into ~15 qubit sub-circuits (parallel on Maestro)...")
     t0 = time.time()
 
-    qaoa_cloud = GraphPartitioningQAOA(
-        graph=G_cloud,
-        graph_problem=GraphProblem.MAXCUT,
+    qaoa_cloud = QAOA(
+        problem=MaxCutProblem(graph=G_cloud, config=partition_config_cloud),
         n_layers=2,
         optimizer=optim,
-        partitioning_config=partition_config_cloud,
         max_iterations=5,
         backend=qoro_service,
         grouping_strategy="qwc",

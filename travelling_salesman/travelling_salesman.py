@@ -18,8 +18,8 @@ import dimod
 import matplotlib.pyplot as plt
 import numpy as np
 
-from divi.backends import ParallelSimulator, QoroService, JobConfig
-from divi.qprog.algorithms import QAOA
+from divi.backends import QiskitSimulator, QoroService, JobConfig
+from divi.qprog import QAOA
 from divi.qprog.optimizers import MonteCarloOptimizer
 
 
@@ -267,7 +267,7 @@ def solve_with_qaoa(
         The solved QAOA instance.
     """
     if backend is None:
-        backend = ParallelSimulator(shots=shots)
+        backend = QiskitSimulator(shots=shots)
 
     optimizer = MonteCarloOptimizer(
         population_size=population_size,
@@ -538,11 +538,15 @@ def solve_partitioned_tsp(
     Returns:
         (tour, distance)
     """
-    import hybrid
-    from divi.qprog import QUBOPartitioningQAOA
+    # NOTE: QUBOPartitioningQAOA and the `hybrid` library were removed in divi.
+    # Use divi.qprog.workflows.PartitioningProgramEnsemble for decomposed QUBO solving.
+    raise NotImplementedError(
+        "solve_partitioned_tsp requires QUBOPartitioningQAOA which has been removed from divi. "
+        "Please use divi.qprog.workflows.PartitioningProgramEnsemble instead."
+    )
 
     if backend is None:
-        backend = ParallelSimulator(shots=shots)
+        backend = QiskitSimulator(shots=shots)
 
     n_cities = len(dist_matrix)
     n_vars = len(bqm.variables)
@@ -552,25 +556,7 @@ def solve_partitioned_tsp(
 
     optimizer = MonteCarloOptimizer(population_size=30, n_best_sets=5)
 
-    qubo_partition = QUBOPartitioningQAOA(
-        qubo=bqm,
-        decomposer=hybrid.EnergyImpactDecomposer(size=decomposer_size),
-        composer=hybrid.SplatComposer(),
-        n_layers=n_layers,
-        optimizer=optimizer,
-        max_iterations=max_iterations,
-        backend=backend,
-    )
-
-    qubo_partition.create_programs()
-    qubo_partition.run()
-    solution, energy = qubo_partition.aggregate_results()
-
-    print(f"      Energy: {energy:.4f}")
-
-    # Decode the aggregated bitstring
     var_list = list(bqm.variables)
-    sample = {var_list[k]: int(solution[k]) for k in range(len(var_list))}
 
     # Try exact decode, then repair
     tour = decode_tour(sample, n_cities)
@@ -630,7 +616,7 @@ def solve_with_pce(
     from divi.typing import qubo_to_matrix
 
     if backend is None:
-        backend = ParallelSimulator(shots=shots)
+        backend = QiskitSimulator(shots=shots)
 
     n_cities = len(dist_matrix)
     qubo_mat = qubo_to_matrix(bqm)
@@ -711,8 +697,8 @@ if __name__ == "__main__":
         backend = QoroService(job_config=JobConfig(shots=SHOTS))
         print("☁️  Using QoroService cloud backend")
     else:
-        backend = ParallelSimulator(shots=SHOTS)
-        print("💻 Using local ParallelSimulator")
+        backend = QiskitSimulator(shots=SHOTS)
+        print("💻 Using local QiskitSimulator")
 
     # =================================================================
     #  Part A — Direct QAOA on a small instance (4 cities / 16 qubits)

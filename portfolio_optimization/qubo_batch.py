@@ -8,12 +8,14 @@ from functools import partial
 from typing import Any
 
 from divi.backends import CircuitRunner
-from divi.qprog.algorithms import QAOA, QUBOProblemTypes
-from divi.qprog.batch import ProgramBatch
+from divi.qprog import QAOA
+from divi.qprog.ensemble import ProgramEnsemble
 from divi.qprog.optimizers import MonteCarloOptimizer, Optimizer
+from divi.qprog.problems import BinaryOptimizationProblem
+from divi.typing import QUBOProblemTypes
 
 
-class QUBOBatch(ProgramBatch):
+class QUBOBatch(ProgramEnsemble):
     """A minimal ProgramBatch that solves multiple QUBO problems in parallel using QAOA.
 
     Takes a collection of QUBO problems and solves each one independently using QAOA,
@@ -98,7 +100,7 @@ class QUBOBatch(ProgramBatch):
 
             self._programs[prog_id] = self._constructor(
                 program_id=prog_id,
-                problem=qubo,
+                problem=BinaryOptimizationProblem(qubo),
                 optimizer=program_optimizer,
                 progress_queue=self._queue,
             )
