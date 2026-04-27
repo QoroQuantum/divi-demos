@@ -1,16 +1,16 @@
-# VQE-based Minimum Birkhoff Decomposition
+# Minimum Birkhoff Decomposition
 
 > 🚀 **Skip the local bottleneck.** Qoro is giving away **$100 in free cloud compute credits.**
 > Get your API key at **[dash.qoroquantum.net](https://dash.qoroquantum.net)** to run this at scale.
 
 ## Why Cloud?
 
-VQE optimizer iterations compound quickly — each iteration evaluates circuits, then the classical `black_box_optimizer` runs multi-threaded post-processing with caching. As matrix dimensions grow, the number of permutations explodes. QoroService offloads the **circuit evaluations** so the classical optimizer never waits for quantum results.
+Each iteration evaluates parameterized circuits, then a multi-threaded classical `black_box_optimizer` (CPLEX) decodes measured bitstrings into the best convex combination of permutations. As matrix dimensions grow, the number of permutations explodes. QoroService offloads the **circuit evaluations** so the classical optimizer never waits for quantum results.
 
 ## Step 0: Set Your API Key
 
 ```bash
-pip install qoro-divi
+pip install qoro-divi docplex cplex
 ```
 
 Create a `.env` file in the repo root:
@@ -23,19 +23,24 @@ QORO_API_KEY="your_api_key_here"
 
 ## What It Does
 
-Finds the Birkhoff decomposition of doubly stochastic matrices using VQE. Built by **inheriting from Divi's VQE class** with only two changes:
+Birkhoff decomposition is a *non-VQE* problem — its cost function isn't a Hamiltonian expectation value, but a CPLEX integer program over measured bitstrings. This demo shows how to wire that into Divi by composing two primitives directly: a `CircuitPipeline` that returns raw shot histograms, and a Divi optimizer that drives any Python `cost_fn(params) -> float` you give it.
 
-1. **Override post-processing** — connects quantum measurements to the problem-specific `black_box_optimizer`
-2. **Implement the classical routine** — multi-threaded optimizer with caching
+If your problem fits the shape *"sample circuits, then do classical work on the histograms,"* it fits this template — Hamiltonian or not.
 
-All circuit execution, backend management, and optimization orchestration is inherited from Divi.
+Under the hood:
+
+1. A standalone **`CircuitPipeline`** (`PennyLaneSpecStage → MeasurementStage(COUNTS) → ParameterBindingStage`) maps parameter sets to raw shot histograms.
+2. A plain `cost_fn(params)` decodes each bitstring into a permutation combination, runs the multi-threaded **`black_box_optimizer`** (CPLEX) with caching, and returns a scalar loss.
+3. A Divi optimizer (`ScipyOptimizer` or `MonteCarloOptimizer`) iterates `cost_fn` to convergence via its public `optimize(...)` API.
 
 ## Files
 
 | File | Description |
 |---|---|
-| `birkhoff_vqe.py` | Core logic: `BirkhoffDecomposition` class extending VQE |
-| `main.py` | Executable script with data loading, CLI args, visualization |
+| `birkhoff_decomposition.ipynb` | Walkthrough notebook — recommended starting point |
+| `birkhoff.py` | Core logic: `run_birkhoff(...)` orchestrating pipeline + optimizer |
+| `main.py` | CLI runner with data loading, argparse, visualization |
+| `requirements.txt` | Demo-specific deps (qoro-divi, docplex, cplex) |
 
 ## Quick Start
 
@@ -58,8 +63,8 @@ python main.py --help
 | `-k` | `--comb` | Number of permutations | `2` |
 | `-m` | `--matrix_type` | `sparse` or `dense` | `sparse` |
 | `-inst` | `--instance` | Problem instance (1-10) | `1` |
-| `-it` | `--iterations` | Max VQE optimizer iterations | `10` |
-| `-opt` | `--optimizer` | VQE optimizer | `Cobyla` |
+| `-it` | `--iterations` | Max optimizer iterations | `10` |
+| `-opt` | `--optimizer` | Optimizer (`Cobyla` or `MonteCarlo`) | `Cobyla` |
 
 ## Citation
 

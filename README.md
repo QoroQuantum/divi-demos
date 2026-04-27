@@ -53,10 +53,10 @@ Partitioned QAOA for MaxCut on large, community-structured graphs. Splits large 
 
 ### 2. [Minimum Birkhoff Decomposition](./minimum_birkhoff_decomposition) ☁️
 
-VQE-based approach to find the Birkhoff decomposition of doubly stochastic matrices. Showcases the modular design of Divi — a sophisticated application built by inheriting from the VQE class with minimal code.
+Approximate Birkhoff decomposition of doubly stochastic matrices using a parameterized circuit + classical CPLEX post-processor. Built directly on Divi's standalone `CircuitPipeline`: the cost function is an integer LP over measured bitstrings, wired into a Python `cost_fn(params) -> float` that any Divi optimizer can drive.
 
-**The bottleneck:** VQE optimizer iterations × multi-threaded classical post-processing compound quickly.
-**The fix:** QoroService offloads the VQE circuit evaluations so the classical optimizer isn't starved.
+**The bottleneck:** Optimizer iterations × multi-threaded classical post-processing compound quickly.
+**The fix:** QoroService offloads the circuit evaluations so the classical optimizer isn't starved.
 
 📓 **[Interactive notebook](./minimum_birkhoff_decomposition/birkhoff_decomposition.ipynb)** — step-by-step tutorial
 
