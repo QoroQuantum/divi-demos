@@ -1,6 +1,1 @@
-qoro-divi==0.10.0
-networkx
-matplotlib
-numpy
-pennylane
-dimod
+qoro-divi[jupyter]>=0.11.0

@@ -69,8 +69,7 @@ Quantum portfolio optimization using QAOA and PCE combined with spectral partiti
 **The bottleneck:** 480 assets → dozens of QAOA partitions. Running them sequentially on a local simulator takes hours.
 **The fix:** QoroService runs every partition in parallel — all portfolios optimized simultaneously.
 
-📓 **[QAOA notebook](./portfolio_optimization/portfolio_optimization.ipynb)** — full QAOA workflow  
-📓 **[PCE notebook](./portfolio_optimization/portfolio_optimization_pce.ipynb)** — same problem with logarithmic qubit compression
+📓 **[Interactive notebook](./portfolio_optimization/portfolio_optimization.ipynb)** — QAOA workflow + PCE variation showing the same `PartitioningProgramEnsemble` flow with logarithmic qubit compression
 
 ---
 
