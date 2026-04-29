@@ -29,7 +29,7 @@ from divi.pipeline.stages import (
     PennyLaneSpecStage,
 )
 from divi.pipeline.stages._measurement_stage import ResultFormat
-from divi.qprog.algorithms._ansatze import Ansatz, GenericLayerAnsatz
+from divi.qprog import Ansatz, GenericLayerAnsatz
 from divi.qprog.optimizers import (
     MonteCarloOptimizer,
     Optimizer,

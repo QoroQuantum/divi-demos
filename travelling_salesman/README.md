@@ -33,7 +33,7 @@ QORO_API_KEY="your_api_key_here"
 Finds the shortest cyclic tour through **N randomly placed cities** using three quantum approaches:
 
 1. **Direct QAOA** — Solves the uncompressed QUBO (uses n² qubits). Good for small instances.
-2. **Partitioned QAOA** (`QUBOPartitioningQAOA`) — Divi decomposes the QUBO into smaller sub-problems, solves in parallel, and merges results. Scales to large instances.
+2. **Partitioned QAOA** (`PartitioningProgramEnsemble` + a dwave-hybrid decomposer) — Divi decomposes the QUBO into smaller sub-problems, solves in parallel, and reassembles via beam search. Scales to large instances.
 3. **PCE** (Pauli Correlation Encoding) — Compresses QUBO variables logarithmically. Fewer qubits for NISQ devices.
 
 ### Phase 1 — Local Toy Problem

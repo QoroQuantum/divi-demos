@@ -26,8 +26,8 @@ import numpy as np
 import pennylane as qml
 
 from divi.backends import QiskitSimulator, QoroService, JobConfig
-from divi.circuits import circuit_body_to_qasm
-from divi.qprog import TimeEvolution
+from divi.circuits import qscript_to_meta, dag_to_qasm_body
+from divi.qprog import CustomPerQubitState, TimeEvolution
 from divi.hamiltonians import ExactTrotterization, QDrift
 
 
@@ -186,9 +186,15 @@ def phase_export(args):
             continue
 
         tape = build_neel_circuit_tape(H, N_QUBITS, neel_state, t, N_STEPS, order=ORDER)
-        body_qasm = circuit_body_to_qasm(tape, precision=10)
 
-        # Append measurement on all qubits
+        # tape → MetaCircuit → DAG → QASM body. Both helpers are public; the
+        # old single-shot circuit_body_to_qasm was retired in favour of this
+        # split (build a DAG once, emit QASM at any precision later).
+        meta = qscript_to_meta(tape, precision=10, parameter_order=())
+        _, dag = meta.circuit_bodies[0]
+        body_qasm = dag_to_qasm_body(dag, precision=10)
+
+        # Append a measurement on every qubit.
         measure_lines = "".join(
             f"measure q[{w}] -> c[{w}];\n" for w in range(N_QUBITS)
         )
@@ -223,14 +229,13 @@ def phase_run(args):
     neel_state = "10" * (N_QUBITS // 2) + ("1" if N_QUBITS % 2 else "")
 
     # --- Backends ---
-    USE_CLOUD = True
     local_backend = QiskitSimulator(shots=SHOTS, track_depth=True)
-    if USE_CLOUD:
+    print("Local backend: QiskitSimulator (SV reference)")
+    if args.cloud:
         cloud_backend = QoroService(job_config=JobConfig(shots=SHOTS, force_sampling=True))
-        print("☁️  Cloud backend: QoroService (superconducting_qpus)")
+        print("Cloud backend: QoroService")
     else:
         cloud_backend = None
-    print("💻 Local backend:  ParallelSimulator (SV reference)")
 
     # Load time metadata
     times_file = os.path.join(original_dir, "times.npy")
@@ -243,6 +248,7 @@ def phase_run(args):
     H = build_tfim_hamiltonian(n_qubits=N_QUBITS, J=1.0, h=0.5)
     observable = qml.PauliZ(0)
     hw_backend = cloud_backend if cloud_backend else local_backend
+    hw_label = "cloud hardware" if cloud_backend else "local (no --cloud)"
 
     # ── 1. Exact SV baseline (local — ground truth) ───────────────
     print("\n" + "=" * 70)
@@ -260,7 +266,7 @@ def phase_run(args):
             time=t,
             n_steps=N_STEPS,
             order=ORDER,
-            initial_state=neel_state,
+            initial_state=CustomPerQubitState(neel_state),
             observable=observable,
             backend=local_backend,
             trotterization_strategy=ExactTrotterization(),
@@ -274,7 +280,7 @@ def phase_run(args):
 
     # ── 2. Exact Trotterization — cloud/hardware ──────────────────
     print("\n" + "=" * 70)
-    print("  2. Exact Trotterization — cloud hardware")
+    print(f"  2. Exact Trotterization — {hw_label}")
     print("=" * 70)
 
     mag_exact_hw = []
@@ -288,7 +294,7 @@ def phase_run(args):
             time=t,
             n_steps=N_STEPS,
             order=ORDER,
-            initial_state=neel_state,
+            initial_state=CustomPerQubitState(neel_state),
             observable=observable,
             backend=hw_backend,
             trotterization_strategy=ExactTrotterization(),
@@ -304,7 +310,7 @@ def phase_run(args):
     mag_compressed = None
     if compressed_dir and os.path.isdir(compressed_dir):
         print("\n" + "=" * 70)
-        print(f"  3. Compressed circuits — cloud hardware ({compressed_dir}/)")
+        print(f"  3. Compressed circuits — {hw_label} ({compressed_dir}/)")
         print("=" * 70)
 
         mag_compressed = load_and_execute_qasm(
@@ -319,7 +325,7 @@ def phase_run(args):
 
     # ── 4. QDrift — cloud/hardware ────────────────────────────────
     print("\n" + "=" * 70)
-    print(f"  4. QDrift — cloud hardware (sampling_budget={SAMPLING_BUDGET})")
+    print(f"  4. QDrift — {hw_label} (sampling_budget={SAMPLING_BUDGET})")
     print("=" * 70)
 
     mag_qdrift = []
@@ -333,7 +339,7 @@ def phase_run(args):
             time=t,
             n_steps=N_STEPS,
             order=ORDER,
-            initial_state=neel_state,
+            initial_state=CustomPerQubitState(neel_state),
             observable=observable,
             backend=hw_backend,
             trotterization_strategy=QDrift(sampling_budget=SAMPLING_BUDGET, keep_fraction=0.75, sampling_strategy="weighted"),
@@ -355,18 +361,18 @@ def phase_run(args):
 
     plt.plot(
         times, mag_exact_hw, "D-", color="#3b82f6",
-        label="Exact Trotter (hardware)", linewidth=2, markersize=7,
+        label=f"Exact Trotter ({hw_label})", linewidth=2, markersize=7,
     )
 
     if mag_compressed is not None:
         plt.plot(
             times, mag_compressed, "^-", color="#10b981",
-            label="Compressed (hardware)", linewidth=2, markersize=8,
+            label=f"Compressed ({hw_label})", linewidth=2, markersize=8,
         )
 
     plt.plot(
         times, mag_qdrift, "s--", color="#f97316",
-        label=f"QDrift (hardware, budget={SAMPLING_BUDGET})", linewidth=2, markersize=7,
+        label=f"QDrift ({hw_label}, budget={SAMPLING_BUDGET})", linewidth=2, markersize=7,
     )
 
     plt.axhline(0, color="black", linestyle="-", alpha=0.2)
@@ -414,14 +420,11 @@ if __name__ == "__main__":
 
     # Run subcommand
     run_parser = subparsers.add_parser("run", parents=[shared], help="Run exact, reload compressed QASM, run QDrift, and compare")
-    run_parser.add_argument("--shots", type=int, default=10_000, help="Measurement shots (default: 20000)")
+    run_parser.add_argument("--shots", type=int, default=10_000, help="Measurement shots (default: 10000)")
     run_parser.add_argument("--sampling-budget", type=int, default=50, help="QDrift sampling budget (default: 50)")
     run_parser.add_argument("--compressed-dir", type=str, default=None, help="Directory with compressed QASM circuits (optional)")
+    run_parser.add_argument("--cloud", action="store_true", help="Run hardware comparisons on QoroService (otherwise local-only)")
     run_parser.set_defaults(func=phase_run)
 
     args = parser.parse_args()
     args.func(args)
-
-
-
-# c8b4e972-1efd-40fd-84ef-ffd7a14fde4d

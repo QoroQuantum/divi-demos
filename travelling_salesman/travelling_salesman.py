@@ -18,9 +18,13 @@ import dimod
 import matplotlib.pyplot as plt
 import numpy as np
 
+import hybrid
+
 from divi.backends import QiskitSimulator, QoroService, JobConfig
-from divi.qprog import QAOA
+from divi.qprog import QAOA, EarlyStopping
 from divi.qprog.optimizers import MonteCarloOptimizer
+from divi.qprog.problems import BinaryOptimizationProblem
+from divi.qprog.workflows import PartitioningProgramEnsemble
 
 
 # ─────────────────────────────────────────────────────────────────────
@@ -261,7 +265,7 @@ def solve_with_qaoa(
         population_size:  Monte Carlo population size.
         n_best_sets:      Number of elite parameter sets to keep.
         shots:            Measurement samples per circuit evaluation.
-        backend:          Divi backend (ParallelSimulator or QoroService).
+        backend:          Divi backend (defaults to QiskitSimulator).
 
     Returns:
         The solved QAOA instance.
@@ -275,7 +279,7 @@ def solve_with_qaoa(
     )
 
     qaoa = QAOA(
-        problem=bqm,
+        problem=BinaryOptimizationProblem(bqm),
         n_layers=n_layers,
         max_iterations=max_iterations,
         optimizer=optimizer,
@@ -478,26 +482,10 @@ def print_comparison(
     quantum_tour: list[int],
     quantum_dist: float,
 ):
-    """Print a formatted comparison of classical vs quantum solutions."""
-    print("\n" + "=" * 70)
-    print("  🗺️  Travelling Salesman — Classical vs. Quantum")
-    print("=" * 70)
-    print(f"\n   Classical optimum:  tour = {classical_tour}")
-    print(f"                       distance = {classical_dist:.4f}")
-    print(f"\n   QAOA result:        tour = {quantum_tour}")
-    print(f"                       distance = {quantum_dist:.4f}")
-
+    """Print a one-line comparison of classical vs quantum solutions."""
     ratio = quantum_dist / classical_dist
-    if abs(ratio - 1.0) < 0.01:
-        print("\n   🎉 QAOA found the optimal tour!")
-    else:
-        print(f"\n   ⚡ Quantum / Classical ratio = {ratio:.3f}")
-        if ratio < 1.05:
-            print("      Excellent — within 5% of the optimum.")
-        else:
-            print("      Try increasing n_layers or max_iterations.")
-
-    print("\n" + "=" * 70)
+    print(f"  classical {classical_tour} d={classical_dist:.4f}  |  "
+          f"quantum {quantum_tour} d={quantum_dist:.4f}  |  ratio={ratio:.3f}")
 
 
 # ─────────────────────────────────────────────────────────────────────
@@ -505,67 +493,93 @@ def print_comparison(
 # ─────────────────────────────────────────────────────────────────────
 #
 #  For larger TSP instances the QUBO has n² variables — too many for a
-#  single QAOA run.  Divi's QUBOPartitioningQAOA automatically:
+#  single QAOA run.  Divi's PartitioningProgramEnsemble (driven by a
+#  dwave-hybrid decomposer) automatically:
 #    1. Decomposes the QUBO into smaller sub-problems
 #    2. Solves each sub-problem with QAOA in parallel
-#    3. Recomposes the solutions into a full bitstring
+#    3. Reassembles a global solution via beam-search aggregation
 #
 
 def solve_partitioned_tsp(
     bqm: dimod.BinaryQuadraticModel,
     dist_matrix: np.ndarray,
-    decomposer_size: int = 25,
+    decomposer_size: int = 15,
     n_layers: int = 2,
-    max_iterations: int = 15,
+    max_iterations: int = 10,
+    population_size: int = 30,
+    n_best_sets: int = 5,
     shots: int = 10_000,
     backend=None,
+    patience: int = 3,
 ) -> tuple[list[int], float]:
-    """Solve a large TSP using Divi's QUBOPartitioningQAOA.
+    """Solve a large TSP via ``PartitioningProgramEnsemble``.
 
-    This is the key Divi differentiator: the QUBO is automatically
-    decomposed into smaller sub-problems using energy-impact
-    decomposition, solved with QAOA in parallel, and recomposed.
+    The QUBO is decomposed into sub-problems of at most ``decomposer_size``
+    variables using dwave-hybrid's :class:`EnergyImpactDecomposer`, each
+    sub-QAOA runs in parallel, and the global tour is reassembled via beam
+    search.
+
+    .. note::
+        TSP's one-hot constraints span the entire QUBO, so partitioned QAOA
+        is fundamentally a stress test of the partitioning machinery here —
+        cuts that bisect a city or a time slot's constraint produce
+        infeasible sub-problems. Solution quality on TSP via this route is
+        expected to be poor; the value of the demo is showing the wiring on
+        a hard problem.
 
     Args:
-        bqm:               Binary Quadratic Model for the TSP.
-        dist_matrix:       Distance matrix (n_cities × n_cities).
-        decomposer_size:   Max variables per sub-problem (default 15).
-        n_layers:          QAOA circuit depth per sub-problem.
-        max_iterations:    Optimizer iterations per sub-problem.
-        shots:             Measurement shots.
-        backend:           Divi backend.
+        bqm: Binary Quadratic Model for the TSP.
+        dist_matrix: Distance matrix (n_cities × n_cities).
+        decomposer_size: Max variables per sub-problem.
+        n_layers: QAOA circuit depth per sub-problem.
+        max_iterations: Optimizer iterations per sub-problem.
+        population_size: MonteCarloOptimizer population.
+        n_best_sets: Top parameter sets retained per iteration.
+        shots: Measurement shots.
+        backend: Divi backend (defaults to QiskitSimulator).
+        patience: EarlyStopping patience per sub-problem.
 
     Returns:
-        (tour, distance)
+        ``(tour, distance)`` — tour is decoded (or repaired) from the
+        aggregated bitstring.
     """
-    # NOTE: QUBOPartitioningQAOA and the `hybrid` library were removed in divi.
-    # Use divi.qprog.workflows.PartitioningProgramEnsemble for decomposed QUBO solving.
-    raise NotImplementedError(
-        "solve_partitioned_tsp requires QUBOPartitioningQAOA which has been removed from divi. "
-        "Please use divi.qprog.workflows.PartitioningProgramEnsemble instead."
-    )
-
     if backend is None:
         backend = QiskitSimulator(shots=shots)
 
     n_cities = len(dist_matrix)
-    n_vars = len(bqm.variables)
+    print(f"  QUBO: {len(bqm.variables)} variables → decomposing into "
+          f"sub-problems of ≤{decomposer_size}")
 
-    print(f"\n   📦 QUBO has {n_vars} variables — decomposing into "
-          f"chunks of ≤{decomposer_size}")
+    problem = BinaryOptimizationProblem(
+        bqm,
+        decomposer=hybrid.EnergyImpactDecomposer(size=decomposer_size),
+    )
+    ensemble = PartitioningProgramEnsemble(
+        problem=problem,
+        quantum_routine="qaoa",
+        n_layers=n_layers,
+        optimizer=MonteCarloOptimizer(
+            population_size=population_size, n_best_sets=n_best_sets,
+        ),
+        max_iterations=max_iterations,
+        early_stopping=EarlyStopping(patience=patience),
+        backend=backend,
+    )
+    ensemble.create_programs()
+    print(f"  Created {len(ensemble.programs)} sub-programs")
+    ensemble.run().join()
 
-    optimizer = MonteCarloOptimizer(population_size=30, n_best_sets=5)
+    solution_array, _ = ensemble.aggregate_results(
+        beam_width=3, n_partition_candidates=5,
+    )
 
+    # The aggregated solution is in BQM variable order. Re-key by name and
+    # decode (or repair) into a TSP tour.
     var_list = list(bqm.variables)
+    sample = {var_list[i]: int(solution_array[i]) for i in range(len(var_list))}
+    tour = decode_tour(sample, n_cities) or repair_tour(sample, n_cities)
 
-    # Try exact decode, then repair
-    tour = decode_tour(sample, n_cities)
-    if tour is None:
-        tour = repair_tour(sample, n_cities)
-
-    dist = tour_length(tour, dist_matrix)
-
-    return tour, dist
+    return tour, tour_length(tour, dist_matrix)
 
 
 # ─────────────────────────────────────────────────────────────────────
@@ -613,7 +627,7 @@ def solve_with_pce(
     import pennylane as qml
     from divi.qprog import PCE, GenericLayerAnsatz
     from divi.qprog.optimizers import PymooMethod, PymooOptimizer
-    from divi.typing import qubo_to_matrix
+    from divi.hamiltonians import qubo_to_matrix
 
     if backend is None:
         backend = QiskitSimulator(shots=shots)
@@ -688,97 +702,51 @@ def solve_with_pce(
 # =====================================================================
 
 if __name__ == "__main__":
-
-    # --- Backend selection ---
-    USE_CLOUD = False       # Set to True to use QoroService cloud backend
+    USE_CLOUD = False
     SHOTS = 20_000
-
-    if USE_CLOUD:
-        backend = QoroService(job_config=JobConfig(shots=SHOTS))
-        print("☁️  Using QoroService cloud backend")
-    else:
-        backend = QiskitSimulator(shots=SHOTS)
-        print("💻 Using local QiskitSimulator")
-
-    # =================================================================
-    #  Part A — Direct QAOA on a small instance (4 cities / 16 qubits)
-    # =================================================================
-    print("\n" + "=" * 70)
-    print("  Part A — Direct QAOA (small instance)")
-    print("=" * 70)
-
-    N_CITIES_SMALL = 4
     SEED = 42
+    N_CITIES_SMALL = 4
+    N_CITIES_LARGE = 8
 
+    backend = (
+        QoroService(job_config=JobConfig(shots=SHOTS))
+        if USE_CLOUD
+        else QiskitSimulator(shots=SHOTS)
+    )
+    print(f"Backend: {'QoroService' if USE_CLOUD else 'QiskitSimulator'} (shots={SHOTS})")
+
+    # ── Part A: Direct QAOA ────────────────────────────────────────
+    print(f"\n=== Part A: Direct QAOA ({N_CITIES_SMALL} cities, "
+          f"{N_CITIES_SMALL**2} qubits) ===")
     cities_small = generate_cities(N_CITIES_SMALL, seed=SEED)
     dist_small = compute_distance_matrix(cities_small)
-    print(f"\n📍 Generated {N_CITIES_SMALL} cities ({N_CITIES_SMALL}² = "
-          f"{N_CITIES_SMALL**2} qubits)")
-
-    plot_cities(cities_small, title=f"TSP — {N_CITIES_SMALL} Cities (Direct QAOA)")
-
     bqm_small, _ = build_tsp_qubo(dist_small)
-    print(f"   QUBO: {len(bqm_small.variables)} variables, "
-          f"{len(bqm_small.quadratic)} interactions")
-
     classical_tour_small, classical_dist_small = classical_brute_force(dist_small)
-    print(f"   Classical optimum: {classical_tour_small}  "
-          f"distance = {classical_dist_small:.4f}")
 
-    print("\n🚀 Running direct QAOA...")
     qaoa = solve_with_qaoa(bqm_small, n_layers=3, max_iterations=10,
                            shots=SHOTS, backend=backend)
     result_small = extract_best_tour(qaoa, bqm_small, dist_small)
+    q_tour_small, q_dist_small = result_small
+    print_comparison(classical_tour_small, classical_dist_small,
+                     q_tour_small, q_dist_small)
+    plot_cities(cities_small, title=f"TSP — {N_CITIES_SMALL} Cities (Direct QAOA)")
 
-    if result_small:
-        q_tour_small, q_dist_small = result_small
-        print(f"\n   ✅ QAOA tour: {q_tour_small}  distance = {q_dist_small:.4f}")
-        print_comparison(classical_tour_small, classical_dist_small,
-                         q_tour_small, q_dist_small)
-
-    # =================================================================
-    #  Part B — Partitioned QAOA on a larger instance (8 cities / 64 qubits)
-    #
-    #  This is the Divi differentiator: the QUBO is too large for a single
-    #  QAOA run, so we partition it and solve the sub-problems in parallel.
-    # =================================================================
-    print("\n" + "=" * 70)
-    print("  Part B — Partitioned QAOA (larger instance, Divi's advantage)")
-    print("=" * 70)
-
-    N_CITIES_LARGE = 8
+    # ── Part B: Partitioned QAOA on a larger instance ──────────────
+    # 64 qubits is well beyond a single QAOA — partition + parallelize.
+    # NB: TSP one-hot constraints don't decompose cleanly, so this is a
+    # stress-test of the partitioning machinery, not a way to set records.
+    print(f"\n=== Part B: Partitioned QAOA ({N_CITIES_LARGE} cities, "
+          f"{N_CITIES_LARGE**2} qubits) ===")
     cities_large = generate_cities(N_CITIES_LARGE, seed=SEED)
     dist_large = compute_distance_matrix(cities_large)
-    print(f"\n📍 Generated {N_CITIES_LARGE} cities ({N_CITIES_LARGE}² = "
-          f"{N_CITIES_LARGE**2} qubits)")
-    print(f"   ⚠️  64 qubits is too large for a single QAOA run")
-    print(f"   → Using Divi's partitioned QUBO solving")
-
-    plot_cities(cities_large, title=f"TSP — {N_CITIES_LARGE} Cities (Partitioned QAOA)")
-
     bqm_large, _ = build_tsp_qubo(dist_large)
-    print(f"   QUBO: {len(bqm_large.variables)} variables, "
-          f"{len(bqm_large.quadratic)} interactions")
-
-    # Classical brute-force (still tractable for 8 cities: 7! = 5040)
     classical_tour_large, classical_dist_large = classical_brute_force(dist_large)
-    print(f"   Classical optimum: {classical_tour_large}  "
-          f"distance = {classical_dist_large:.4f}")
 
-    # Partitioned QAOA
-    print("\n🚀 Running partitioned QAOA (QUBOPartitioningQAOA)...")
     q_tour_large, q_dist_large = solve_partitioned_tsp(
         bqm_large, dist_large,
-        decomposer_size=15,
-        n_layers=2,
-        max_iterations=10,
-        shots=SHOTS,
-        backend=backend,
+        decomposer_size=15, n_layers=2, max_iterations=10,
+        shots=SHOTS, backend=backend,
     )
-
-    print(f"\n   ✅ Partitioned QAOA tour: {q_tour_large}")
-    print(f"      Distance: {q_dist_large:.4f}")
-
     print_comparison(classical_tour_large, classical_dist_large,
                      q_tour_large, q_dist_large)
     plot_comparison(
@@ -787,66 +755,34 @@ if __name__ == "__main__":
         save_path="tsp_partitioned_comparison.png",
     )
 
-    # =================================================================
-    #  Part C — PCE encoding (qubit compression)
-    #
-    #  PCE uses polynomial encoding to compress n² QUBO variables into
-    #  far fewer qubits.  This is a different strategy from QAOA:
-    #  instead of using n² qubits, PCE achieves logarithmic compression.
-    # =================================================================
-    print("\n" + "=" * 70)
-    print("  Part C — PCE (Pauli Correlation Encoding, qubit compression)")
-    print("=" * 70)
-
-    # Run PCE on the same small instance for a fair comparison with Part A
-    print(f"\n📍 Same {N_CITIES_SMALL}-city instance as Part A "
-          f"(but with qubit compression)")
-
-    print("\n🚀 Running PCE-VQE...")
+    # ── Part C: PCE compression ────────────────────────────────────
+    # Same small instance as Part A, but PCE compresses N² variables
+    # into far fewer qubits via parity-encoding.
+    print(f"\n=== Part C: PCE compression (same {N_CITIES_SMALL}-city "
+          f"instance, qubit-compressed) ===")
     pce_tour, pce_dist, pce_qubits = solve_with_pce(
         bqm_small, dist_small,
-        n_layers=3,
-        max_iterations=20,
-        shots=SHOTS,
-        backend=backend,
+        n_layers=3, max_iterations=20, shots=SHOTS, backend=backend,
     )
-
-    print(f"\n   ✅ PCE tour: {pce_tour}  distance = {pce_dist:.4f}")
-    print(f"      Qubits used: {pce_qubits}  "
-          f"(vs {N_CITIES_SMALL**2} for direct QAOA)")
+    print(f"  PCE qubits: {pce_qubits} (vs {N_CITIES_SMALL**2} for direct QAOA)")
     print_comparison(classical_tour_small, classical_dist_small,
                      pce_tour, pce_dist)
 
-    # =================================================================
-    #  Summary — Compare all three methods
-    # =================================================================
-    print("\n" + "=" * 70)
-    print("  📊 Summary — Three Divi Approaches to TSP")
-    print("=" * 70)
-
-    print(f"\n  {'Method':<35} {'Cities':>6} {'Qubits':>8} {'Distance':>10} {'Ratio':>8}")
-    print(f"  {'─'*67}")
-    print(f"  {'Classical (brute force)':<35} {N_CITIES_SMALL:>6} {'—':>8} "
-          f"{classical_dist_small:>10.4f} {'1.000':>8}")
-
-    if result_small:
-        ratio_a = q_dist_small / classical_dist_small
-        print(f"  {'A: Direct QAOA':<35} {N_CITIES_SMALL:>6} "
-              f"{N_CITIES_SMALL**2:>8} {q_dist_small:>10.4f} {ratio_a:>8.3f}")
-
-    ratio_c = pce_dist / classical_dist_small
-    print(f"  {'C: PCE (poly encoding)':<35} {N_CITIES_SMALL:>6} "
-          f"{pce_qubits:>8} {pce_dist:>10.4f} {ratio_c:>8.3f}")
-
-    print(f"\n  {'Classical (brute force)':<35} {N_CITIES_LARGE:>6} {'—':>8} "
-          f"{classical_dist_large:>10.4f} {'1.000':>8}")
-    ratio_b = q_dist_large / classical_dist_large
-    print(f"  {'B: Partitioned QAOA':<35} {N_CITIES_LARGE:>6} "
-          f"{'≤15':>8} {q_dist_large:>10.4f} {ratio_b:>8.3f}")
-
-    print(f"\n  Key insight: Divi offers three complementary strategies:")
-    print(f"    • Direct QAOA    — best for small instances (≤16 qubits)")
-    print(f"    • PCE encoding   — compresses qubits logarithmically")
-    print(f"    • Partitioned    — scales to arbitrarily large instances")
-    print("=" * 70)
+    # ── Summary ────────────────────────────────────────────────────
+    print("\n=== Summary ===")
+    rows = [
+        (f"Classical (brute force)", N_CITIES_SMALL, "—",
+         classical_dist_small, 1.000),
+        (f"A: Direct QAOA", N_CITIES_SMALL, str(N_CITIES_SMALL**2),
+         q_dist_small, q_dist_small / classical_dist_small),
+        (f"C: PCE (poly encoding)", N_CITIES_SMALL, str(pce_qubits),
+         pce_dist, pce_dist / classical_dist_small),
+        (f"Classical (brute force)", N_CITIES_LARGE, "—",
+         classical_dist_large, 1.000),
+        (f"B: Partitioned QAOA", N_CITIES_LARGE, "≤15",
+         q_dist_large, q_dist_large / classical_dist_large),
+    ]
+    print(f"  {'Method':<28} {'Cities':>6} {'Qubits':>7} {'Distance':>10} {'Ratio':>7}")
+    for name, nc, nq, dist, ratio in rows:
+        print(f"  {name:<28} {nc:>6} {nq:>7} {dist:>10.4f} {ratio:>7.3f}")
 

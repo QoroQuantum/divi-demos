@@ -1,3 +1,0 @@
-qoro-divi
-networkx
-matplotlib

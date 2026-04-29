@@ -20,7 +20,7 @@ import numpy as np
 import pennylane as qp
 from birkhoff import combination_to_integer, run_birkhoff
 from divi.backends import MaestroSimulator
-from divi.qprog.algorithms._ansatze import GenericLayerAnsatz
+from divi.qprog import GenericLayerAnsatz
 from divi.qprog.optimizers import MonteCarloOptimizer, ScipyMethod, ScipyOptimizer
 
 

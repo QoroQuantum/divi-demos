@@ -16,7 +16,7 @@ import time
 from divi.backends import QiskitSimulator, QoroService, JobConfig
 from divi.qprog import PCE, GenericLayerAnsatz
 from divi.qprog.optimizers import PymooMethod, PymooOptimizer
-from divi.typing import qubo_to_matrix
+from divi.hamiltonians import qubo_to_matrix
 
 
 # ─────────────────────────────────────────────────────────────────────
@@ -258,7 +258,7 @@ def solve_with_pce(bqm, n_layers=3, max_iterations=20, alpha=3.0,
         alpha:            binary activation hardness (higher = sharper)
         population_size:  DE population per generation
         shots:            measurement samples per circuit evaluation
-        backend:          Divi backend (ParallelSimulator or QoroService)
+        backend:          Divi backend (QiskitSimulator or QoroService)
 
     Returns:
         pce_solver:  the solved PCE object (access .solution, .get_top_solutions)

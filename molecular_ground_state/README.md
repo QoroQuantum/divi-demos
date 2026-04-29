@@ -27,7 +27,7 @@ Computes the **potential energy surface (PES)** of hydrogen (H₂) — ground-st
 
 - **`VQEHyperparameterSweep`** — grid search over ansätze × Hamiltonians in parallel
 - **`VQE` with molecular Hamiltonians** — finds the ground-state energy of a qubit Hamiltonian
-- **Multiple ansätze** — compare UCCSD (chemistry gold standard) vs. HardwareEfficient (gate-efficient)
+- **Multiple ansätze** — compare UCCSD (chemistry gold standard) vs. GenericLayer (RY+RZ / CNOT, gate-efficient)
 
 ### Phase 1 — Local PES (5 bond lengths)
 
@@ -58,12 +58,14 @@ jupyter notebook molecular_ground_state.ipynb
   UCCSDAnsatz:
     Equilibrium bond length : 0.740 Å
     Ground-state energy     : -1.136189 Ha
+    Points computed         : 12
 
-  HardwareEfficient:
+  GenericLayerAnsatz:
     Equilibrium bond length : 0.740 Å
     Ground-state energy     : -1.130422 Ha
+    Points computed         : 12
 
-  🏆 Best overall: UCCSDAnsatz at scale=1.00  →  E = -1.136189 Ha
+  🏆 Best overall: UCCSDAnsatz at r=0.74 Å  →  E = -1.136189 Ha
 ======================================================================
 ```
 
