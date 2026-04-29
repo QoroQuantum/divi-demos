@@ -7,7 +7,7 @@ Core algorithm implementation from:
 
 Contains:
   - Graph generation and cost functions
-  - QAOA correlation extraction via Divi
+  - Two-point correlation extraction (QAOA or PCE) → uniform CorrelationResult
   - Correlation-guided cluster Monte Carlo (Algorithm 1)
   - Simulated annealing baseline
   - Coupling-constant baseline
@@ -17,12 +17,13 @@ import math
 import random
 import time
 from dataclasses import dataclass, field
+from typing import Literal
 
 import networkx as nx
 import numpy as np
 
 from divi.backends import QiskitSimulator
-from divi.qprog import QAOA
+from divi.qprog import QAOA, EarlyStopping
 from divi.qprog.problems import MaxCutProblem
 from divi.qprog.optimizers import PymooOptimizer, PymooMethod
 from divi.hamiltonians import QDrift
@@ -48,14 +49,6 @@ def generate_random_maxcut_graph(
 # ──────────────────────────────────────────────────────────────────
 # 2. Max-Cut cost evaluation
 # ──────────────────────────────────────────────────────────────────
-def maxcut_cost(G: nx.Graph, config: np.ndarray) -> float:
-    """Compute the weighted Max-Cut cost C(x) = Σ_{(i,j)∈E} w_ij * (1 - x_i x_j) / 2."""
-    cost = 0.0
-    for u, v, w in G.edges(data="weight", default=1.0):
-        cost += w * (1.0 - config[u] * config[v]) / 2.0
-    return cost
-
-
 def unweighted_cut_size(G: nx.Graph, config: np.ndarray) -> int:
     """Count the number of edges crossing the partition (unweighted)."""
     return sum(1 for u, v in G.edges() if config[u] != config[v])
@@ -70,103 +63,117 @@ def ising_energy(G: nx.Graph, config: np.ndarray) -> float:
 
 
 # ──────────────────────────────────────────────────────────────────
-# 3. Extract two-point correlations from QAOA using Divi
+# 3. Two-point correlation extraction (QAOA or PCE)
 # ──────────────────────────────────────────────────────────────────
+@dataclass
+class CorrelationResult:
+    """Uniform return type for both QAOA and PCE correlation extractors.
+
+    Lets the cluster algorithm and plotting code stay source-agnostic —
+    swap one line in the notebook to switch between QAOA and PCE.
+    """
+
+    Z: np.ndarray
+    label: str
+    n_qubits: int
+    total_circuit_count: int
+    elapsed: float
+    instance: object = None
+
+
+def _correlations_from_distribution(
+    distribution, n_vars: int
+) -> np.ndarray:
+    """Compute Z_ij = ⟨Z_i Z_j⟩ = Σ_x p(x) · spin(x)_i · spin(x)_j.
+
+    ``distribution`` is an iterable of ``(bitstring, prob)`` pairs where each
+    bitstring is the length-``n_vars`` 0/1 assignment in variable order.
+    """
+    Z = np.zeros((n_vars, n_vars))
+    for bitstring, prob in distribution:
+        spins = np.fromiter(
+            (1 - 2 * int(b) for b in bitstring), dtype=float, count=n_vars
+        )
+        Z += prob * np.outer(spins, spins)
+    np.fill_diagonal(Z, 1.0)
+    return Z
+
+
 def extract_qaoa_correlations(
     G: nx.Graph,
-    n_layers: int,
+    n_layers: int = 2,
+    *,
     max_iterations: int = 10,
+    patience: int = 3,
     shots: int = 10_000,
     use_qdrift: bool = False,
     backend=None,
-) -> tuple[np.ndarray, "QAOA"]:
+) -> CorrelationResult:
     """Run QAOA on a Max-Cut instance and extract the ZZ correlation matrix.
 
-    The correlation Z_ij = ⟨ψ_opt| σ_i^z σ_j^z |ψ_opt⟩ is computed for every
-    edge (i,j) in the graph. Divi's QWC (qubit-wise commuting) grouping batches
-    all ZZ observables into a minimal number of measurement circuits.
+    The optimized state is sampled and Z_ij = Σ_x p(x) · σ_i^z(x) · σ_j^z(x)
+    is computed classically from bitstring frequencies.
 
     Args:
         G: The graph (Max-Cut instance).
         n_layers: Number of QAOA layers (circuit depth p).
-        max_iterations: Optimizer iterations.
+        max_iterations: Optimizer iterations (cap; early-stopping may halt sooner).
+        patience: EarlyStopping patience.
         shots: Number of measurement shots.
         use_qdrift: If True, use QDrift trotterization for shallower circuits.
-        backend: Divi backend to use (e.g. ParallelSimulator or QoroService).
-                 Defaults to ParallelSimulator if not provided.
+        backend: Divi backend. Defaults to QiskitSimulator.
 
     Returns:
-        Z: (n x n) correlation matrix where Z[i][j] = ⟨Z_i Z_j⟩.
-        qaoa_problem: The solved QAOA instance for further inspection.
+        CorrelationResult — Z matrix plus metadata for plots/tables.
     """
     n = G.number_of_nodes()
-
     if backend is None:
         backend = QiskitSimulator(shots=shots)
 
-    # Build the QAOA kwargs
     qaoa_kwargs = dict(
         problem=MaxCutProblem(G),
         n_layers=n_layers,
         optimizer=PymooOptimizer(method=PymooMethod.DE, population_size=20),
         max_iterations=max_iterations,
+        early_stopping=EarlyStopping(patience=patience),
         backend=backend,
-        # QWC grouping: groups commuting ZZ observables together
-        # so multiple correlations are measured from a single circuit
         grouping_strategy="qwc",
     )
-
     if use_qdrift:
-        qdrift = QDrift(
+        qaoa_kwargs["trotterization_strategy"] = QDrift(
             keep_fraction=0.3,
             sampling_budget=8,
             n_hamiltonians_per_iteration=3,
             sampling_strategy="weighted",
             seed=42,
         )
-        qaoa_kwargs["trotterization_strategy"] = qdrift
 
-    qaoa_problem = QAOA(**qaoa_kwargs)
-
-    print(f"  Running QAOA with p={n_layers} layers...")
+    qaoa = QAOA(**qaoa_kwargs)
+    label = f"QAOA p={n_layers}"
+    print(f"  Running {label} on {n} qubits...")
     t0 = time.time()
-    qaoa_problem.run(perform_final_computation=True)
+    qaoa.run(perform_final_computation=True)
     elapsed = time.time() - t0
-    print(f"  QAOA done in {elapsed:.1f}s  |  "
-          f"circuits={qaoa_problem.total_circuit_count}  |  "
-          f"best_loss={qaoa_problem.best_loss:.4f}")
+    print(
+        f"  done in {elapsed:.1f}s  |  "
+        f"circuits={qaoa.total_circuit_count}  |  "
+        f"best_loss={qaoa.best_loss:.4f}"
+    )
 
-    # --- Extract ZZ correlations from the measurement distribution ---
-    # Divi's best_probs is a dict keyed by CircuitTag -> {bitstring: probability}
-    raw_probs = qaoa_problem.best_probs
-    if raw_probs is None:
-        raise RuntimeError("QAOA did not produce probability data.")
-
-    # Extract the actual probability distribution from the first measurement group
-    probs: dict[str, float] = {}
-    for tag, shots_dict in raw_probs.items():
-        if isinstance(shots_dict, dict):
-            for bitstring, prob in shots_dict.items():
-                probs[bitstring] = probs.get(bitstring, 0.0) + prob
-            break  # Use the first measurement group
-
-    if not probs:
-        raise RuntimeError("Could not extract probability data from QAOA results.")
-
-    # Compute Z_ij = ⟨Z_i Z_j⟩ = Σ_x p(x) * x_i * x_j
-    # where x_i = (-1)^{bit_i}  (mapping 0->+1, 1->-1 following Ising convention)
-    Z = np.zeros((n, n))
-
-    for bitstring, prob in probs.items():
-        # Convert bitstring to ±1 spin values
-        spins = np.array([1 - 2 * int(b) for b in bitstring])
-        # Accumulate outer product weighted by probability
-        Z += prob * np.outer(spins, spins)
-
-    # Diagonal is always 1 (⟨Z_i^2⟩ = 1), enforce it
-    np.fill_diagonal(Z, 1.0)
-
-    return Z, qaoa_problem
+    # best_probs is {param_set_idx: {bitstring: prob}}; final computation runs
+    # the measurement pipeline on a single best param set, so there's exactly
+    # one entry. Bitstrings here are direct qubit-basis measurements that map
+    # 1:1 onto the N variables.
+    probs = next(iter(qaoa.best_probs.values()))
+    Z = _correlations_from_distribution(probs.items(), n_vars=n)
+    return CorrelationResult(
+        Z=Z,
+        label=label,
+        n_qubits=n,
+        total_circuit_count=qaoa.total_circuit_count,
+        elapsed=elapsed,
+        instance=qaoa,
+    )
 
 
 # ──────────────────────────────────────────────────────────────────
@@ -468,7 +475,7 @@ def coupling_constant_correlations(G: nx.Graph) -> np.ndarray:
 
 
 # ──────────────────────────────────────────────────────────────────
-# 7. PCE-based correlation extraction
+# 7. PCE-based correlation extraction (qubit-compressed alternative to QAOA)
 # ──────────────────────────────────────────────────────────────────
 def maxcut_to_qubo(G: nx.Graph) -> np.ndarray:
     """Convert a Max-Cut graph to a QUBO matrix (minimization form).
@@ -492,95 +499,91 @@ def maxcut_to_qubo(G: nx.Graph) -> np.ndarray:
 
 def extract_pce_correlations(
     G: nx.Graph,
-    encoding_type: str = "dense",
-    max_iterations: int = 10,
-    shots: int = 10_000,
+    encoding: Literal["dense", "poly"] = "dense",
+    *,
+    n_layers: int = 2,
+    max_iterations: int = 15,
     alpha: float = 2.0,
+    shots: int = 10_000,
     backend=None,
-) -> tuple[np.ndarray, "PCE"]:
+) -> CorrelationResult:
     """Run PCE on a Max-Cut QUBO and extract variable-variable correlations.
 
-    PCE encodes N variables into far fewer qubits (O(log₂N) for dense,
-    O(√N) for poly) using Pauli correlation encoding. Each variable is
-    mapped to the parity of a qubit subset. We decode the measurement
-    distribution to recover variable-level correlations.
+    PCE compresses N variables into O(log₂N) (dense) or O(√N) (poly) qubits
+    by mapping each variable to the parity of a fixed qubit subset. The
+    optimized state is sampled in the encoded space and decoded — each
+    encoded bitstring becomes an N-vector of ±1 spins via PCE's masks,
+    yielding the same Z_ij matrix as QAOA.
 
     Args:
         G: The Max-Cut graph.
-        encoding_type: "dense" (log₂N qubits) or "poly" (√N qubits).
-        max_iterations: Optimizer iterations for PCE.
+        encoding: ``"dense"`` (log₂N qubits) or ``"poly"`` (√N qubits).
+        n_layers: PCE ansatz depth.
+        max_iterations: Optimizer iterations.
+        alpha: PCE soft-relaxation parameter (lower = smoother gradient).
         shots: Number of measurement shots.
-        alpha: PCE softness parameter (lower = smoother gradient).
-        backend: Divi backend. Defaults to ParallelSimulator.
+        backend: Divi backend. Defaults to QiskitSimulator.
 
     Returns:
-        Z: (n x n) correlation matrix decoded from PCE measurements.
-        pce_instance: The solved PCE instance for inspection.
+        CorrelationResult — Z matrix plus metadata.
     """
+    # Lazy import keeps PCE optional for the QAOA-only path.
     from divi.qprog import PCE
-    from divi.qprog.algorithms._pce import _fast_popcount_parity
 
     n = G.number_of_nodes()
     Q = maxcut_to_qubo(G)
-
     if backend is None:
         backend = QiskitSimulator(shots=shots)
 
-    # First create PCE without n_electrons to discover n_qubits,
-    # then set n_electrons (UCCSD requires n_electrons < n_qubits, even).
-    pce_instance = PCE(
+    # PCE's UCCSD ansatz needs n_electrons set, even, and < n_qubits — but
+    # n_qubits depends on the encoding. Mirror divi's encoding formulas so
+    # we can pass both at construction.
+    if encoding == "dense":
+        n_qubits = max(1, int(np.ceil(np.log2(n + 1))))
+    else:  # poly
+        n_qubits = max(1, int(np.ceil((-1 + np.sqrt(1 + 8 * n)) / 2)))
+    n_electrons = max(2, (n_qubits - 2) // 2 * 2)
+
+    pce = PCE(
         Q,
-        encoding_type=encoding_type,
+        encoding_type=encoding,
+        n_qubits=n_qubits,
+        n_electrons=n_electrons,
         alpha=alpha,
-        n_layers=2,
-        n_electrons=2,   # placeholder — will be overridden
+        n_layers=n_layers,
         max_iterations=max_iterations,
         backend=backend,
         optimizer=PymooOptimizer(method=PymooMethod.DE, population_size=20),
     )
-    # Now set n_electrons properly: must be even and < n_qubits
-    n_elec = max(2, (pce_instance.n_qubits - 2) // 2 * 2)
-    pce_instance.n_electrons = n_elec
 
-    print(f"  Running PCE ({encoding_type} encoding, "
-          f"{pce_instance.n_qubits} qubits for {n} variables)...")
+    label = f"PCE {encoding}"
+    print(
+        f"  Running {label} ({pce.n_qubits} qubits for {n} variables)..."
+    )
     t0 = time.time()
-    pce_instance.run(perform_final_computation=True)
+    pce.run(perform_final_computation=True)
     elapsed = time.time() - t0
-    print(f"  PCE done in {elapsed:.1f}s  |  "
-          f"circuits={pce_instance.total_circuit_count}  |  "
-          f"best_loss={pce_instance.best_loss:.4f}")
+    print(
+        f"  done in {elapsed:.1f}s  |  "
+        f"circuits={pce.total_circuit_count}  |  "
+        f"best_loss={pce.best_loss:.4f}"
+    )
 
-    # --- Decode variable-variable correlations from PCE measurements ---
-    raw_probs = pce_instance.best_probs
-    if raw_probs is None:
-        raise RuntimeError("PCE did not produce probability data.")
-
-    probs: dict[str, float] = {}
-    for tag, shots_dict in raw_probs.items():
-        if isinstance(shots_dict, dict):
-            for bitstring, prob in shots_dict.items():
-                probs[bitstring] = probs.get(bitstring, 0.0) + prob
-            break
-
-    if not probs:
-        raise RuntimeError("Could not extract probability data from PCE results.")
-
-    # For each bitstring in the encoded space, decode the parity of each
-    # variable using PCE's masks, then compute the correlation matrix.
-    masks = pce_instance._variable_masks_u64
-    Z = np.zeros((n, n))
-
-    for bitstring, prob in probs.items():
-        x = np.uint64(int(bitstring, 2))
-        # Compute parity for each variable: popcount(x & mask_i) % 2
-        overlaps = masks & x
-        parities = _fast_popcount_parity(overlaps)
-        # Convert parities to ±1 spins (0 → +1, 1 → −1)
-        spins = 1.0 - 2.0 * parities.astype(float)
-        Z += prob * np.outer(spins, spins)
-
-    np.fill_diagonal(Z, 1.0)
-
-    return Z, pce_instance
+    # PCE.get_top_solutions returns SolutionEntry(bitstring, prob, ...) where
+    # ``bitstring`` is the *decoded* length-N variable assignment — we never
+    # touch PCE's encoded qubit space.
+    n_states = len(next(iter(pce.best_probs.values())))
+    distribution = (
+        (entry.bitstring, entry.prob)
+        for entry in pce.get_top_solutions(n=n_states, sort_by="prob")
+    )
+    Z = _correlations_from_distribution(distribution, n_vars=n)
+    return CorrelationResult(
+        Z=Z,
+        label=label,
+        n_qubits=pce.n_qubits,
+        total_circuit_count=pce.total_circuit_count,
+        elapsed=elapsed,
+        instance=pce,
+    )
 

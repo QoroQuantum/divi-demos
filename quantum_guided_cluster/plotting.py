@@ -86,10 +86,10 @@ def plot_approximation_ratios(results: dict, save_path: str = "approximation_rat
     colors.append(COLORS["cc"])
     edge_colors.append(COLORS["cc"])
 
-    # QAOA at each depth
-    for i, (p, res) in enumerate(sorted(results["qaoa_results"].items())):
+    # Quantum-guided sources (QAOA at each depth, plus any PCE encodings)
+    for i, (label, res) in enumerate(results["quantum_results"].items()):
         ratios = [e / E_ground for e in res.energy_history]
-        methods.append(f"QAOA\np={p}")
+        methods.append(label.replace(" ", "\n"))
         means.append(np.mean(ratios))
         stds.append(np.std(ratios))
         c = QAOA_COLORS[i % len(QAOA_COLORS)]
@@ -120,17 +120,6 @@ def plot_approximation_ratios(results: dict, save_path: str = "approximation_rat
     ax.legend(loc="lower right", fontsize=11)
     ax.grid(axis="y", alpha=0.2)
 
-    # Info box
-    G = results["graph"]
-    info = (f"Graph: {G.number_of_nodes()} nodes, {G.number_of_edges()} edges, "
-            f"degree-{list(dict(G.degree()).values())[0]} regular\n"
-            f"E₀ = {E_ground:.1f}   |   "
-            f"Budget: {results.get('n_iterations_factor', '?')}×n iterations")
-    ax.text(0.02, 0.02, info, transform=ax.transAxes, fontsize=10,
-            color=COLORS["accent"], alpha=0.8, verticalalignment="bottom",
-            bbox=dict(boxstyle="round,pad=0.3", facecolor=COLORS["panel"],
-                      edgecolor=COLORS["grid"], alpha=0.9))
-
     plt.tight_layout()
     plt.savefig(save_path, dpi=200, bbox_inches="tight",
                 facecolor=COLORS["bg"], edgecolor="none")
@@ -150,13 +139,15 @@ def plot_correlation_heatmaps(
     """
     setup_dark_style()
     n_plots = len(correlations)
-    fig, axes = plt.subplots(1, n_plots, figsize=(5 * n_plots + 1, 5))
+    # constrained_layout handles the shared colorbar + suptitle correctly;
+    # plt.tight_layout warns when colorbars span multiple axes.
+    fig, axes = plt.subplots(
+        1, n_plots, figsize=(5 * n_plots + 1, 5), layout="constrained"
+    )
     if n_plots == 1:
         axes = [axes]
 
-    # Custom diverging colormap
     cmap = plt.cm.RdBu_r
-
     vmax = max(np.abs(Z).max() for Z in correlations.values())
 
     for ax, (label, Z) in zip(axes, correlations.items()):
@@ -165,20 +156,12 @@ def plot_correlation_heatmaps(
         ax.set_xlabel("Qubit j", fontsize=11)
         ax.set_ylabel("Qubit i", fontsize=11)
 
-        # Highlight edges
-        for u, v, w in G.edges(data="weight", default=1.0):
-            color = "#00ff88" if w > 0 else "#ff4444"
-            ax.plot(v, u, "s", markersize=3, color=color, alpha=0.4)
-            ax.plot(u, v, "s", markersize=3, color=color, alpha=0.4)
-
     fig.suptitle("Two-Point Correlations ⟨ZᵢZⱼ⟩: Coupling Constants vs QAOA Depths",
-                 fontsize=15, fontweight="bold", y=1.02)
+                 fontsize=15, fontweight="bold")
 
-    # Colorbar
     cbar = fig.colorbar(im, ax=axes, shrink=0.8, pad=0.02)
     cbar.set_label("⟨ZᵢZⱼ⟩", fontsize=12)
 
-    plt.tight_layout()
     plt.savefig(save_path, dpi=200, bbox_inches="tight",
                 facecolor=COLORS["bg"], edgecolor="none")
     print(f"📊 Saved: {save_path}")
@@ -208,23 +191,16 @@ def plot_circuit_efficiency(
     x = np.arange(len(depths))
     width = 0.35
 
-    bars_qwc = ax.bar(x - width/2, circuit_counts, width,
-                       color=COLORS["accent"] + "60",
-                       edgecolor=COLORS["accent"], linewidth=2,
-                       label="Divi QWC Grouping (actual)")
+    ax.bar(x - width/2, circuit_counts, width,
+           color=COLORS["accent"] + "60",
+           edgecolor=COLORS["accent"], linewidth=2,
+           label="Divi QWC Grouping (actual)")
 
-    # For each depth, estimate naive circuit count
-    # Naive = n_edges * n_iterations (each iteration measures all terms separately)
-    # But we can't know exact iterations, so show per-iteration comparison
-    ax2 = ax.twinx()
-    # Grouping factor: how many fewer circuits QWC uses vs naive (per iteration)
-    # This is approximate — show the edge count vs QWC groups
-    for i, (p, count) in enumerate(zip(depths, circuit_counts)):
+    for i, count in enumerate(circuit_counts):
         ax.text(x[i] - width/2, count + 1, str(count),
                 ha="center", va="bottom", fontsize=13, fontweight="bold",
                 color=COLORS["accent"])
 
-    # Show naive line
     ax.axhline(y=n_edges, color=COLORS["sa"], linestyle="--", alpha=0.7,
                label=f"Observables in Hamiltonian ({n_edges})")
 
@@ -237,9 +213,6 @@ def plot_circuit_efficiency(
     ax.set_xticklabels([f"p = {p}" for p in depths], fontsize=13)
     ax.legend(loc="upper left", fontsize=11)
     ax.grid(axis="y", alpha=0.2)
-
-    # Remove twin axis (was a placeholder)
-    ax2.set_yticks([])
 
     plt.tight_layout()
     plt.savefig(save_path, dpi=200, bbox_inches="tight",
@@ -279,11 +252,11 @@ def plot_energy_distribution(results: dict, save_path: str = "energy_distributio
     labels.append("Coupling\nConstants")
     colors_list.append(COLORS["cc"])
 
-    # QAOA depths
-    for i, (p, res) in enumerate(sorted(results["qaoa_results"].items())):
+    # Quantum-guided sources
+    for i, (label, res) in enumerate(results["quantum_results"].items()):
         ratios = [e / E_ground for e in res.energy_history]
         all_data.append(ratios)
-        labels.append(f"QAOA\np={p}")
+        labels.append(label.replace(" ", "\n"))
         colors_list.append(QAOA_COLORS[i % len(QAOA_COLORS)])
 
     positions = np.arange(len(all_data))
@@ -300,12 +273,6 @@ def plot_energy_distribution(results: dict, save_path: str = "energy_distributio
         if key in parts:
             parts[key].set_color(COLORS["text"])
             parts[key].set_linewidth(1.5)
-
-    # Overlay individual points
-    for i, data in enumerate(all_data):
-        jitter = np.random.RandomState(42).normal(0, 0.04, len(data))
-        ax.scatter(positions[i] + jitter, data, c=colors_list[i],
-                   alpha=0.6, s=30, zorder=5, edgecolors="none")
 
     ax.axhline(y=1.0, color=COLORS["accent"], linestyle="--", alpha=0.5,
                label="Optimal (r=1)")
